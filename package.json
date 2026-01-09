@@ -15,8 +15,11 @@
     "@babel/parser": "^7.28.5",
     "@babel/traverse": "^7.28.5",
     "@babel/types": "^7.28.5",
+    "@types/babel__traverse": "^7.28.0",
+    "@types/dagre": "^0.7.53",
     "@xyflow/react": "^12.10.0",
     "axios": "^1.13.2",
+    "dagre": "^0.8.5",
     "next": "16.1.1",
     "react": "19.2.3",
     "react-dom": "19.2.3"

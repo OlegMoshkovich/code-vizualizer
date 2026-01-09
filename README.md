@@ -5,17 +5,18 @@ A Next.js application that visualizes TypeScript code as interactive function gr
 ## 🚀 Project Status
 
 **Phase 1: Basic Setup & Foundation** ✅ **COMPLETED**
+**Phase 2: Code Parsing & Analysis** ✅ **COMPLETED**
 
-This phase includes URL input, validation, code fetching, and foundational architecture.
+### Completed Phases
+- **Phase 1**: URL input, validation, code fetching, and foundational architecture
+- **Phase 2**: TypeScript parsing, AST analysis, function extraction, and graph building
 
 ### Upcoming Phases
-- **Phase 2**: TypeScript parsing and AST analysis (Babel integration)
-- **Phase 3**: Interactive graph visualization with React Flow
+- **Phase 3**: Enhanced interactive visualization and advanced features
 
-## 📋 Features (Phase 1)
+## 📋 Features
 
-### ✅ Completed Features
-
+### ✅ Phase 1: Foundation
 - **URL Input Component**: Clean, accessible interface for pasting TypeScript file URLs
 - **URL Validation**: Comprehensive validation with support for GitHub, Gist, and direct file URLs
 - **Code Fetching**: Robust HTTP client with error handling, timeout, and file size limits
@@ -23,6 +24,16 @@ This phase includes URL input, validation, code fetching, and foundational archi
 - **Responsive Design**: Mobile-friendly interface with Tailwind CSS
 - **Testing Suite**: Comprehensive test coverage with Jest and React Testing Library
 - **Accessibility**: WCAG compliant with proper ARIA labels and keyboard navigation
+
+### ✅ Phase 2: Code Analysis
+- **TypeScript Parser**: Advanced AST parsing using Babel with TypeScript support
+- **Function Extraction**: Extracts all function types (declarations, arrows, methods, async)
+- **Call Relationship Mapping**: Tracks function calls and dependencies
+- **React Flow Integration**: Converts parsed data to interactive graph format
+- **Automatic Layout**: Multiple layout algorithms (hierarchical, horizontal, circular)
+- **API Endpoints**: RESTful API for code parsing with rate limiting
+- **Comprehensive Testing**: 80+ test cases covering parsing, graphs, and API routes
+- **Error Handling**: Graceful handling of syntax errors and malformed code
 
 ### 🔧 Technical Architecture
 
@@ -34,12 +45,26 @@ src/
 ├── components/      # React components
 │   ├── URLInput.tsx # URL input and validation component
 │   └── URLInput.test.tsx
-├── lib/            # Utility functions
+├── lib/            # Core parsing and analysis modules
 │   ├── utils.ts    # URL validation and code fetching
-│   └── utils.test.ts
+│   ├── utils.test.ts
+│   ├── codeParser.ts      # TypeScript AST parsing engine
+│   ├── codeParser.test.ts # 67+ parser test cases
+│   ├── graphBuilder.ts    # React Flow graph generation
+│   ├── graphBuilder.test.ts
+│   ├── layoutEngine.ts    # Automatic graph layout algorithms
+│   ├── layoutEngine.test.ts
+│   └── __fixtures__/      # Test fixtures for various TS patterns
+│       ├── simple.ts      # Basic functions and calls
+│       ├── complex.ts     # Classes, async, generics
+│       ├── edge-cases.ts  # IIFE, closures, recursion
+│       └── invalid.ts     # Broken syntax for error testing
 └── app/            # Next.js app router
-    ├── layout.tsx  # App layout with React Flow CSS
-    └── page.tsx    # Main application page
+    ├── layout.tsx         # App layout with React Flow CSS
+    ├── page.tsx          # Main application with graph visualization
+    └── api/parse-code/   # REST API for code analysis
+        ├── route.ts      # Parse endpoint with rate limiting
+        └── route.test.ts # API integration tests
 ```
 
 ## 🛠️ Installation & Setup
@@ -78,12 +103,21 @@ npm run build
 npm run start
 ```
 
-## 📝 Usage (Phase 1)
+## 📝 Usage
 
+### Phase 1 & 2 Features
 1. **Paste a TypeScript file URL** into the input field
-2. **Click "Analyze"** to fetch and validate the code
-3. **View the results** including file information and code preview
-4. **See placeholder** for future graph visualization
+2. **Click "Analyze"** to fetch and parse the code
+3. **View the interactive graph** showing function relationships
+4. **Explore parsing results** including metadata and function details
+5. **Use JSON preview** for detailed analysis data
+
+### Graph Visualization
+- **Interactive Nodes**: Functions displayed as styled nodes with type information
+- **Relationship Edges**: Arrows showing function call dependencies
+- **Automatic Layout**: Smart positioning using multiple layout algorithms
+- **Function Metadata**: Parameters, return types, async status, export information
+- **Visual Categories**: Different styles for exported, async, and class methods
 
 ### Supported URL Types
 
@@ -101,10 +135,15 @@ npm run start
 
 ## 🧪 Testing
 
-### Test Coverage
+### Comprehensive Test Coverage
 - **Types**: Type guards and interface validation
 - **Components**: User interactions, accessibility, error states
 - **Utilities**: URL validation, HTTP fetching, error handling
+- **Parser Engine**: 67+ test cases covering AST parsing, function extraction, error handling
+- **Graph Builder**: Node/edge creation, filtering, graph manipulation
+- **Layout Engine**: Automatic positioning algorithms and viewport centering
+- **API Routes**: Request validation, rate limiting, error responses, integration tests
+- **Test Fixtures**: Real-world TypeScript patterns for comprehensive validation
 
 ### Running Tests
 ```bash
@@ -156,16 +195,17 @@ npm run test:coverage
 - **@xyflow/react**: Graph visualization (ready for Phase 2)
 - **Axios**: HTTP client for code fetching
 
+### Phase 2 Dependencies
+- **@babel/parser**: TypeScript AST parsing
+- **@babel/traverse**: AST traversal  
+- **@babel/types**: AST type definitions
+- **dagre**: Automatic graph layout algorithms
+
 ### Development Dependencies
 - **Jest**: Testing framework
 - **React Testing Library**: Component testing
 - **@testing-library/user-event**: User interaction testing
 - **@testing-library/jest-dom**: Custom Jest matchers
-
-### Future Dependencies (Phase 2)
-- **@babel/parser**: TypeScript AST parsing
-- **@babel/traverse**: AST traversal
-- **@babel/types**: AST type definitions
 
 ## 🔄 Development Workflow
 
@@ -181,21 +221,22 @@ npm run build    # Production build
 - Comprehensive commit messages
 - Test coverage required
 
-## 🎯 Next Steps (Phase 2)
+## 🎯 Next Steps (Phase 3)
 
-1. **TypeScript Parser Integration**
-   - Implement Babel parser for AST generation
-   - Extract function definitions and calls
-   - Handle TypeScript-specific syntax
+1. **Enhanced Visualization**
+   - Interactive graph controls (zoom, pan, filter)
+   - Advanced node styling and animations
+   - Minimap and overview panels
 
-2. **Function Analysis**
-   - Identify function parameters and return types
-   - Map function call relationships
-   - Extract JSDoc comments
+2. **Advanced Analysis**
+   - Complexity metrics and code quality indicators  
+   - Dependency analysis and circular dependency detection
+   - Performance bottleneck identification
 
-3. **Error Handling**
-   - Parse errors and syntax issues
-   - Graceful degradation for partial analysis
+3. **Export & Sharing**
+   - Graph export (PNG, SVG, PDF)
+   - Shareable visualization URLs
+   - Integration with development tools
 
 ## 🤝 Contributing
 
@@ -216,3 +257,11 @@ npm run build    # Production build
   - Code fetching infrastructure
   - Testing framework
   - Project architecture
+
+- **v0.2.0**: Phase 2 - Code Parsing & Analysis
+  - TypeScript AST parsing with Babel
+  - Function extraction and call relationship mapping
+  - React Flow graph generation with automatic layout
+  - REST API endpoints with rate limiting
+  - Comprehensive test suite (80+ test cases)
+  - Interactive graph visualization

@@ -1,25 +1,75 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import URLInput from '../src/components/URLInput';
-import { CodeFetchResult, AnalysisStatus } from '../src/types';
+import { CodeFetchResult, AnalysisStatus, GraphData } from '../src/types';
+
+interface ParseResult {
+  nodes: GraphData['nodes'];
+  edges: GraphData['edges'];
+  metadata: {
+    fileName: string;
+    totalFunctions: number;
+    totalCalls: number;
+    imports: string[];
+    exports: string[];
+    fileSize?: number;
+    parseTime: number;
+  };
+}
 
 export default function Home() {
   const [analysisResult, setAnalysisResult] = useState<CodeFetchResult | null>(null);
+  const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus>('idle');
+  const [parseError, setParseError] = useState<string | null>(null);
 
-  const handleAnalyze = (result: CodeFetchResult) => {
+  const handleAnalyze = useCallback(async (result: CodeFetchResult) => {
     setAnalysisResult(result);
-  };
+    setParseResult(null);
+    setParseError(null);
 
-  const handleStatusChange = (status: AnalysisStatus) => {
+    if (result.success && result.content) {
+      // Call the parse API
+      try {
+        setAnalysisStatus('parsing');
+        
+        const response = await fetch('/api/parse-code', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            url: result.url,
+          }),
+        });
+
+        const parseData = await response.json();
+
+        if (parseData.success) {
+          setParseResult(parseData.data);
+          setAnalysisStatus('complete');
+        } else {
+          setParseError(parseData.error);
+          setAnalysisStatus('error');
+        }
+      } catch (error) {
+        setParseError(error instanceof Error ? error.message : 'Failed to parse code');
+        setAnalysisStatus('error');
+      }
+    }
+  }, []);
+
+  const handleStatusChange = useCallback((status: AnalysisStatus) => {
     setAnalysisStatus(status);
-  };
+  }, []);
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setAnalysisResult(null);
+    setParseResult(null);
+    setParseError(null);
     setAnalysisStatus('idle');
-  };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
@@ -107,18 +157,143 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* Placeholder for Visualization */}
-                  <div className="mt-6 p-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 text-center">
-                    <div className="text-gray-500">
-                      <svg className="mx-auto h-12 w-12 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                      </svg>
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">Function Visualization</h3>
-                      <p className="text-gray-600">
-                        Code parsing and graph visualization will be implemented in Phase 2 & 3
-                      </p>
+                  {/* Parsing Results */}
+                  {analysisStatus === 'parsing' && (
+                    <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                        <span className="font-medium text-blue-700">Parsing TypeScript code...</span>
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {parseError && (
+                    <div className="mt-6 p-4 bg-red-50 rounded-lg">
+                      <div className="flex items-center space-x-2 text-red-600">
+                        <span className="text-red-500">✗</span>
+                        <span className="font-medium">Parsing failed</span>
+                      </div>
+                      <p className="text-red-600 text-sm mt-2">{parseError}</p>
+                    </div>
+                  )}
+
+                  {parseResult && (
+                    <div className="mt-6 space-y-6">
+                      {/* Parse Metadata */}
+                      <div>
+                        <h3 className="font-medium text-gray-900 mb-4">Parse Results:</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div className="bg-green-50 p-3 rounded-lg">
+                            <span className="font-medium text-green-700">Functions:</span>
+                            <p className="text-green-600 text-lg font-bold">{parseResult.metadata.totalFunctions}</p>
+                          </div>
+                          <div className="bg-blue-50 p-3 rounded-lg">
+                            <span className="font-medium text-blue-700">Calls:</span>
+                            <p className="text-blue-600 text-lg font-bold">{parseResult.metadata.totalCalls}</p>
+                          </div>
+                          <div className="bg-purple-50 p-3 rounded-lg">
+                            <span className="font-medium text-purple-700">Imports:</span>
+                            <p className="text-purple-600 text-lg font-bold">{parseResult.metadata.imports.length}</p>
+                          </div>
+                          <div className="bg-orange-50 p-3 rounded-lg">
+                            <span className="font-medium text-orange-700">Exports:</span>
+                            <p className="text-orange-600 text-lg font-bold">{parseResult.metadata.exports.length}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Function List */}
+                      {parseResult.nodes.length > 0 && (
+                        <div>
+                          <h3 className="font-medium text-gray-900 mb-4">Functions Found:</h3>
+                          <div className="bg-white border rounded-lg overflow-hidden">
+                            <div className="max-h-64 overflow-y-auto">
+                              {parseResult.nodes.map((node, index) => (
+                                <div key={node.id} className={`p-3 border-b last:border-b-0 ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}>
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex-1">
+                                      <h4 className="font-medium text-gray-900">{node.data.label}</h4>
+                                      {node.data.parameters && node.data.parameters.length > 0 && (
+                                        <p className="text-sm text-gray-600">
+                                          Parameters: {node.data.parameters.map((p: any) => `${p.name}: ${p.type}`).join(', ')}
+                                        </p>
+                                      )}
+                                      <p className="text-sm text-gray-600">Returns: {node.data.returnType}</p>
+                                    </div>
+                                    <div className="flex space-x-1">
+                                      {node.data.isAsync && (
+                                        <span className="px-2 py-1 bg-purple-100 text-purple-600 text-xs rounded">async</span>
+                                      )}
+                                      {node.data.isExported && (
+                                        <span className="px-2 py-1 bg-green-100 text-green-600 text-xs rounded">exported</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Function Calls */}
+                      {parseResult.edges.length > 0 && (
+                        <div>
+                          <h3 className="font-medium text-gray-900 mb-4">Function Calls:</h3>
+                          <div className="bg-white border rounded-lg overflow-hidden">
+                            <div className="max-h-48 overflow-y-auto">
+                              {parseResult.edges.map((edge, index) => (
+                                <div key={edge.id} className={`p-3 border-b last:border-b-0 ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}>
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <p className="font-medium text-gray-900">
+                                        {parseResult.nodes.find(n => n.id === edge.source)?.data.label} 
+                                        <span className="mx-2 text-gray-400">→</span>
+                                        {parseResult.nodes.find(n => n.id === edge.target)?.data.label}
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      {edge.label && (
+                                        <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">{edge.label}</span>
+                                      )}
+                                      {edge.animated && (
+                                        <span className="px-2 py-1 bg-purple-100 text-purple-600 text-xs rounded">async</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* JSON Preview */}
+                      <details className="border rounded-lg">
+                        <summary className="p-4 bg-gray-50 cursor-pointer font-medium">
+                          View Raw Graph Data (JSON)
+                        </summary>
+                        <div className="p-4 bg-gray-900 rounded-b-lg">
+                          <pre className="text-sm text-gray-100 overflow-x-auto">
+                            <code>{JSON.stringify({ nodes: parseResult.nodes, edges: parseResult.edges }, null, 2)}</code>
+                          </pre>
+                        </div>
+                      </details>
+
+                      {/* Visualization Placeholder */}
+                      <div className="p-8 bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg border-2 border-dashed border-blue-300 text-center">
+                        <div className="text-blue-600">
+                          <svg className="mx-auto h-12 w-12 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                          <h3 className="text-lg font-medium text-blue-900 mb-2">Interactive Graph Visualization</h3>
+                          <p className="text-blue-700">
+                            Coming in Phase 3: Visual graph with {parseResult.nodes.length} nodes and {parseResult.edges.length} relationships
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -135,7 +310,7 @@ export default function Home() {
 
         {/* Footer */}
         <footer className="max-w-4xl mx-auto mt-12 text-center text-gray-500 text-sm">
-          <p>Phase 1: Basic Setup & Foundation - URL Input and Code Fetching</p>
+          <p>Phase 2: Code Parsing & Analysis - TypeScript Function Extraction Complete</p>
         </footer>
       </div>
     </div>
