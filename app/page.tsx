@@ -1,8 +1,25 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, Suspense } from 'react';
+import dynamic from 'next/dynamic';
 import URLInput from '../src/components/URLInput';
 import { CodeFetchResult, AnalysisStatus, GraphData } from '../src/types';
+
+// Dynamic import for FlowVisualizer to avoid SSR issues
+const FlowVisualizer = dynamic(
+  () => import('../src/components/FlowVisualizer'),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading visualization...</p>
+        </div>
+      </div>
+    )
+  }
+);
 
 interface ParseResult {
   nodes: GraphData['nodes'];
@@ -23,6 +40,7 @@ export default function Home() {
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus>('idle');
   const [parseError, setParseError] = useState<string | null>(null);
+  const [showVisualization, setShowVisualization] = useState(false);
 
   const handleAnalyze = useCallback(async (result: CodeFetchResult) => {
     setAnalysisResult(result);
@@ -49,6 +67,7 @@ export default function Home() {
         if (parseData.success) {
           setParseResult(parseData.data);
           setAnalysisStatus('complete');
+          setShowVisualization(true);
         } else {
           setParseError(parseData.error);
           setAnalysisStatus('error');
@@ -69,7 +88,50 @@ export default function Home() {
     setParseResult(null);
     setParseError(null);
     setAnalysisStatus('idle');
+    setShowVisualization(false);
   }, []);
+
+  const handleBackToAnalysis = useCallback(() => {
+    setShowVisualization(false);
+  }, []);
+
+  // Show visualization if we have parsed data
+  if (showVisualization && parseResult) {
+    return (
+      <div className="h-screen">
+        <Suspense fallback={
+          <div className="h-screen flex items-center justify-center bg-gray-50">
+            <div className="text-center">
+              <div className="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading visualization...</p>
+            </div>
+          </div>
+        }>
+          <FlowVisualizer
+            data={{
+              nodes: parseResult.nodes,
+              edges: parseResult.edges
+            }}
+            metadata={{
+              ...parseResult.metadata,
+              url: analysisResult?.url
+            }}
+          />
+        </Suspense>
+        
+        {/* Back button */}
+        <button
+          onClick={handleBackToAnalysis}
+          className="fixed top-4 left-4 z-50 flex items-center space-x-2 px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg shadow-lg transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          <span>Back to Analysis</span>
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
@@ -91,7 +153,7 @@ export default function Home() {
             <ol className="list-decimal list-inside space-y-2 text-gray-700">
               <li>Paste a URL to a TypeScript (.ts) or TSX (.tsx) file</li>
               <li>Click &ldquo;Analyze&rdquo; to fetch and parse the code</li>
-              <li>View the generated function graph (coming in Phase 3)</li>
+              <li>Explore the interactive function graph visualization</li>
             </ol>
           </div>
         </div>
@@ -181,7 +243,18 @@ export default function Home() {
                     <div className="mt-6 space-y-6">
                       {/* Parse Metadata */}
                       <div>
-                        <h3 className="font-medium text-gray-900 mb-4">Parse Results:</h3>
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="font-medium text-gray-900">Parse Results:</h3>
+                          <button
+                            onClick={() => setShowVisualization(true)}
+                            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-sm"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            <span>View Interactive Graph</span>
+                          </button>
+                        </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                           <div className="bg-green-50 p-3 rounded-lg">
                             <span className="font-medium text-green-700">Functions:</span>
@@ -212,19 +285,19 @@ export default function Home() {
                                 <div key={node.id} className={`p-3 border-b last:border-b-0 ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}>
                                   <div className="flex items-center justify-between">
                                     <div className="flex-1">
-                                      <h4 className="font-medium text-gray-900">{node.data.label}</h4>
-                                      {node.data.parameters && node.data.parameters.length > 0 && (
+                                      <h4 className="font-medium text-gray-900">{(node.data as any).label}</h4>
+                                      {(node.data as any).parameters && (node.data as any).parameters.length > 0 && (
                                         <p className="text-sm text-gray-600">
-                                          Parameters: {node.data.parameters.map((p: any) => `${p.name}: ${p.type}`).join(', ')}
+                                          Parameters: {(node.data as any).parameters.map((p: any) => `${p.name}: ${p.type}`).join(', ')}
                                         </p>
                                       )}
-                                      <p className="text-sm text-gray-600">Returns: {node.data.returnType}</p>
+                                      <p className="text-sm text-gray-600">Returns: {(node.data as any).returnType}</p>
                                     </div>
                                     <div className="flex space-x-1">
-                                      {node.data.isAsync && (
+                                      {(node.data as any).isAsync && (
                                         <span className="px-2 py-1 bg-purple-100 text-purple-600 text-xs rounded">async</span>
                                       )}
-                                      {node.data.isExported && (
+                                      {(node.data as any).isExported && (
                                         <span className="px-2 py-1 bg-green-100 text-green-600 text-xs rounded">exported</span>
                                       )}
                                     </div>
@@ -247,9 +320,9 @@ export default function Home() {
                                   <div className="flex items-center justify-between">
                                     <div>
                                       <p className="font-medium text-gray-900">
-                                        {parseResult.nodes.find(n => n.id === edge.source)?.data.label} 
+                                        {(parseResult.nodes.find(n => n.id === edge.source)?.data as any)?.label} 
                                         <span className="mx-2 text-gray-400">→</span>
-                                        {parseResult.nodes.find(n => n.id === edge.target)?.data.label}
+                                        {(parseResult.nodes.find(n => n.id === edge.target)?.data as any)?.label}
                                       </p>
                                     </div>
                                     <div className="flex items-center space-x-2">
@@ -280,16 +353,25 @@ export default function Home() {
                         </div>
                       </details>
 
-                      {/* Visualization Placeholder */}
-                      <div className="p-8 bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg border-2 border-dashed border-blue-300 text-center">
-                        <div className="text-blue-600">
-                          <svg className="mx-auto h-12 w-12 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                          </svg>
-                          <h3 className="text-lg font-medium text-blue-900 mb-2">Interactive Graph Visualization</h3>
-                          <p className="text-blue-700">
-                            Coming in Phase 3: Visual graph with {parseResult.nodes.length} nodes and {parseResult.edges.length} relationships
-                          </p>
+                      {/* Visualization Preview */}
+                      <div className="p-6 bg-gradient-to-br from-green-50 to-blue-50 rounded-lg border border-green-200">
+                        <div className="flex items-center justify-between">
+                          <div className="text-green-600">
+                            <h3 className="text-lg font-medium text-green-900 mb-2">Interactive Graph Ready!</h3>
+                            <p className="text-green-700">
+                              Visual graph with {parseResult.nodes.length} nodes and {parseResult.edges.length} relationships ready to explore
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => setShowVisualization(true)}
+                            className="flex items-center space-x-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors shadow-sm"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            <span>Open Visualization</span>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -310,7 +392,7 @@ export default function Home() {
 
         {/* Footer */}
         <footer className="max-w-4xl mx-auto mt-12 text-center text-gray-500 text-sm">
-          <p>Phase 2: Code Parsing & Analysis - TypeScript Function Extraction Complete</p>
+          <p>Phase 3: React Flow Visualization & Interaction - Complete Interactive Graph Experience</p>
         </footer>
       </div>
     </div>

@@ -60,16 +60,8 @@ export function buildReactFlowGraph(parsedData: ParsedCodeResult): GraphData {
  * @returns React Flow compatible node
  */
 export function createFunctionNode(functionData: FunctionData): Node {
-  // Determine node type based on function characteristics
-  let nodeType = NODE_TYPES.FUNCTION;
-  
-  if (functionData.name.includes('.')) {
-    nodeType = NODE_TYPES.CLASS_METHOD;
-  } else if (functionData.exported) {
-    nodeType = NODE_TYPES.EXPORTED;
-  } else if (functionData.async) {
-    nodeType = NODE_TYPES.ASYNC;
-  }
+  // Use a single node type for React Flow compatibility
+  const nodeType = 'function';
 
   // Create unique node ID
   const nodeId = createNodeId(functionData.name);
@@ -113,24 +105,18 @@ export function createFunctionEdges(calls: FunctionCall[]): Edge[] {
     const [caller, callee] = relationship.split(' -> ');
     const callCount = callList.length;
     
-    // Determine edge type
-    let edgeType = EDGE_TYPES.FUNCTION_CALL;
+    // Use a simple edge type
+    const edgeType = 'smoothstep';
     const hasAsyncCall = callList.some(call => isAsyncCall(call));
-    
-    if (hasAsyncCall) {
-      edgeType = EDGE_TYPES.ASYNC_CALL;
-    } else if (callCount > 1) {
-      edgeType = EDGE_TYPES.MULTIPLE_CALLS;
-    }
 
     // Create edge
     const edge: Edge = {
       id: createEdgeId(caller, callee),
       source: createNodeId(caller),
       target: createNodeId(callee),
-      type: getEdgeType(edgeType),
+      type: edgeType,
       animated: hasAsyncCall,
-      style: getEdgeStyle(edgeType, callCount),
+      style: getEdgeStyle(hasAsyncCall, callCount),
       label: callCount > 1 ? `${callCount}x` : undefined,
       data: {
         calls: callList,
@@ -326,26 +312,25 @@ function getEdgeType(edgeType: string): string {
  * @param callCount - Number of calls
  * @returns Style object
  */
-function getEdgeStyle(edgeType: string, callCount: number): React.CSSProperties {
+function getEdgeStyle(isAsync: boolean, callCount: number): React.CSSProperties {
   const baseStyle: React.CSSProperties = {
     strokeWidth: Math.min(2 + callCount * 0.5, 6),
   };
 
-  switch (edgeType) {
-    case EDGE_TYPES.ASYNC_CALL:
-      return {
-        ...baseStyle,
-        stroke: '#8b5cf6',
-        strokeDasharray: '5,5',
-      };
-    case EDGE_TYPES.MULTIPLE_CALLS:
-      return {
-        ...baseStyle,
-        stroke: '#f59e0b',
-      };
-    default:
-      return {
-        ...baseStyle,
+  if (isAsync) {
+    return {
+      ...baseStyle,
+      stroke: '#8b5cf6',
+      strokeDasharray: '5,5',
+    };
+  } else if (callCount > 1) {
+    return {
+      ...baseStyle,
+      stroke: '#f59e0b',
+    };
+  } else {
+    return {
+      ...baseStyle,
         stroke: '#6b7280',
       };
   }
@@ -389,19 +374,19 @@ export function filterGraph(
     }
     
     if (filter.showMethods !== undefined) {
-      const isMethod = data.label.includes('.');
+      const isMethod = (data as any).label.includes('.');
       if (isMethod !== filter.showMethods) return false;
     }
     
-    if (filter.showAsync !== undefined && data.isAsync !== filter.showAsync) {
+    if (filter.showAsync !== undefined && (data as any).isAsync !== filter.showAsync) {
       return false;
     }
     
-    if (filter.minComplexity !== undefined && data.complexity < filter.minComplexity) {
+    if (filter.minComplexity !== undefined && ((data as any).complexity || 0) < filter.minComplexity) {
       return false;
     }
     
-    if (filter.maxComplexity !== undefined && data.complexity > filter.maxComplexity) {
+    if (filter.maxComplexity !== undefined && ((data as any).complexity || 0) > filter.maxComplexity) {
       return false;
     }
     

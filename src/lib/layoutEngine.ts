@@ -112,15 +112,15 @@ function calculateNodeSize(node: Node, options: LayoutOptions): { width: number;
   let height = baseHeight;
 
   // Factor in function name length
-  if (data.label) {
-    const nameLength = data.label.length;
+  if ((data as any).label) {
+    const nameLength = (data as any).label.length;
     width = Math.max(width, nameLength * 8 + 40); // Rough character width estimation
   }
 
   // Factor in parameters
-  if (data.parameters && Array.isArray(data.parameters)) {
-    const paramCount = data.parameters.length;
-    const longestParam = data.parameters.reduce((longest, param) => {
+  if ((data as any).parameters && Array.isArray((data as any).parameters)) {
+    const paramCount = (data as any).parameters.length;
+    const longestParam = (data as any).parameters.reduce((longest: number, param: any) => {
       const paramText = `${param.name}: ${param.type}`;
       return paramText.length > longest ? paramText.length : longest;
     }, 0);
@@ -135,17 +135,17 @@ function calculateNodeSize(node: Node, options: LayoutOptions): { width: number;
   }
 
   // Factor in return type
-  if (data.returnType && data.returnType !== 'any') {
-    width = Math.max(width, data.returnType.length * 8 + 80);
+  if ((data as any).returnType && (data as any).returnType !== 'any') {
+    width = Math.max(width, (data as any).returnType.length * 8 + 80);
   }
 
   // Add extra space for async functions
-  if (data.isAsync) {
+  if ((data as any).isAsync) {
     width += 60; // Space for "async" label
   }
 
   // Add extra space for exported functions
-  if (data.isExported) {
+  if ((data as any).isExported) {
     width += 60; // Space for "export" label
   }
 
@@ -282,8 +282,8 @@ export function calculateGraphBounds(nodes: Node[]): {
 
   nodes.forEach(node => {
     const { x, y } = node.position;
-    const width = node.style?.width || DEFAULT_LAYOUT_OPTIONS.nodeWidth;
-    const height = node.style?.height || DEFAULT_LAYOUT_OPTIONS.nodeHeight;
+    const width = Number(node.style?.width) || DEFAULT_LAYOUT_OPTIONS.nodeWidth;
+    const height = Number(node.style?.height) || DEFAULT_LAYOUT_OPTIONS.nodeHeight;
 
     minX = Math.min(minX, x);
     minY = Math.min(minY, y);

@@ -31,7 +31,7 @@ const PARSER_CONFIG = {
     'dynamicImport',
     'nullishCoalescingOperator',
     'optionalChaining'
-  ] as const,
+  ],
   strictMode: false,
   allowImportExportEverywhere: true,
   allowReturnOutsideFunction: true,
@@ -72,14 +72,14 @@ export async function parseTypeScriptCode(code: string): Promise<ParsedCodeResul
     let ast;
     try {
       // First attempt: Full TypeScript + JSX
-      ast = parse(code, PARSER_CONFIG);
+      ast = parse(code, PARSER_CONFIG as any);
     } catch (firstError) {
       try {
         // Second attempt: TypeScript only (no JSX)
         ast = parse(code, {
           ...PARSER_CONFIG,
           plugins: PARSER_CONFIG.plugins.filter(p => p !== 'jsx'),
-        });
+        } as any);
       } catch (secondError) {
         // Third attempt: Minimal configuration
         ast = parse(code, {
@@ -89,7 +89,7 @@ export async function parseTypeScriptCode(code: string): Promise<ParsedCodeResul
           allowImportExportEverywhere: true,
           allowReturnOutsideFunction: true,
           allowUndeclaredExports: true,
-        });
+        } as any);
       }
     }
     
@@ -166,8 +166,8 @@ export function extractFunctions(ast: t.Node, sourceCode: string): FunctionData[
       const functionData = createFunctionData(
         node.id.name,
         node.params,
-        node.returnType,
-        node.loc,
+        node.returnType as any,
+        node.loc || null,
         {
           async: node.async,
           exported: isExported(path),
@@ -198,8 +198,8 @@ export function extractFunctions(ast: t.Node, sourceCode: string): FunctionData[
         const functionData = createFunctionData(
           node.id.name,
           functionNode.params,
-          functionNode.returnType,
-          node.loc,
+          functionNode.returnType as any,
+          node.loc || null,
           {
             async: isAsync,
             exported: isExported(path.parent),
@@ -222,8 +222,8 @@ export function extractFunctions(ast: t.Node, sourceCode: string): FunctionData[
       const functionData = createFunctionData(
         methodName,
         node.params,
-        node.returnType,
-        node.loc,
+        node.returnType as any,
+        node.loc || null,
         {
           async: node.async,
           exported: isClassExported(path),
@@ -245,8 +245,8 @@ export function extractFunctions(ast: t.Node, sourceCode: string): FunctionData[
       const functionData = createFunctionData(
         methodName,
         node.params,
-        node.returnType,
-        node.loc,
+        node.returnType as any,
+        node.loc || null,
         {
           async: node.async,
           exported: false, // Object methods are typically not directly exported
@@ -255,6 +255,103 @@ export function extractFunctions(ast: t.Node, sourceCode: string): FunctionData[
       );
 
       functions.push(functionData);
+    },
+
+    // Call expressions with function arguments: useCallback(() => {}, [])
+    CallExpression(path) {
+      const node = path.node;
+      
+      // Check if this is a React hook or similar function call that takes a function as first argument
+      const hookNames = ['useCallback', 'useMemo', 'useEffect', 'useLayoutEffect', 'useState', 'useReducer'];
+      const isHook = t.isIdentifier(node.callee) && hookNames.includes(node.callee.name);
+      
+      // Also check for general function calls that take function arguments
+      const isGenericCall = t.isIdentifier(node.callee) || t.isMemberExpression(node.callee);
+      
+      if ((isHook || isGenericCall) && node.arguments.length > 0) {
+        const firstArg = node.arguments[0];
+        
+        // Check if first argument is an arrow function or function expression
+        if (t.isArrowFunctionExpression(firstArg) || t.isFunctionExpression(firstArg)) {
+          let functionName = '';
+          
+          // Try to get a meaningful name for the function
+          if (isHook && t.isIdentifier(node.callee)) {
+            // For hooks, use the hook name + a counter or context
+            const parent = path.parent;
+            if (t.isVariableDeclarator(parent) && t.isIdentifier(parent.id)) {
+              functionName = `${parent.id.name} (${node.callee.name})`;
+            } else {
+              functionName = `anonymous (${node.callee.name})`;
+            }
+          } else if (t.isIdentifier(node.callee)) {
+            functionName = `callback (${node.callee.name})`;
+          } else if (t.isMemberExpression(node.callee)) {
+            const objectName = t.isIdentifier(node.callee.object) ? node.callee.object.name : 'object';
+            const propertyName = t.isIdentifier(node.callee.property) ? node.callee.property.name : 'method';
+            functionName = `callback (${objectName}.${propertyName})`;
+          } else {
+            functionName = 'anonymous callback';
+          }
+
+          const functionData = createFunctionData(
+            functionName,
+            firstArg.params,
+            firstArg.returnType as any,
+            firstArg.loc || null,
+            {
+              async: firstArg.async,
+              exported: false, // Callback functions are typically not exported
+              documentation: extractJSDoc(path, lines),
+            }
+          );
+
+          functions.push(functionData);
+        }
+      }
+    },
+
+    // JSX Expression containers with functions: <button onClick={() => {}}>
+    JSXExpressionContainer(path) {
+      const node = path.node;
+      const expression = node.expression;
+      
+      // Check if the expression is a function
+      if (t.isArrowFunctionExpression(expression) || t.isFunctionExpression(expression)) {
+        let functionName = 'JSX event handler';
+        
+        // Try to get context from the JSX attribute
+        const parent = path.parent;
+        if (t.isJSXAttribute(parent) && t.isJSXIdentifier(parent.name)) {
+          functionName = `${parent.name.name} handler`;
+        }
+        
+        // Try to get the element name for more context
+        const jsxElement = path.findParent(p => t.isJSXElement(p.node) || t.isJSXFragment(p.node));
+        if (jsxElement && t.isJSXElement(jsxElement.node)) {
+          const opening = jsxElement.node.openingElement;
+          if (t.isJSXIdentifier(opening.name)) {
+            const elementName = opening.name.name;
+            if (t.isJSXAttribute(parent) && t.isJSXIdentifier(parent.name)) {
+              functionName = `${elementName}.${parent.name.name}`;
+            }
+          }
+        }
+
+        const functionData = createFunctionData(
+          functionName,
+          expression.params,
+          expression.returnType as any,
+          expression.loc || null,
+          {
+            async: expression.async,
+            exported: false, // JSX handlers are not exported
+            documentation: '', // JSX handlers typically don't have JSDoc
+          }
+        );
+
+        functions.push(functionData);
+      }
     },
   });
 
@@ -414,7 +511,7 @@ function extractParameters(params: t.Function['params']): FunctionParameter[] {
     if (t.isIdentifier(param)) {
       return {
         name: param.name,
-        type: extractTypeAnnotation(param.typeAnnotation),
+        type: extractTypeAnnotation(param.typeAnnotation as any),
         optional: param.optional || false,
       };
     }
@@ -425,7 +522,7 @@ function extractParameters(params: t.Function['params']): FunctionParameter[] {
       if (t.isIdentifier(left)) {
         return {
           name: left.name,
-          type: extractTypeAnnotation(left.typeAnnotation),
+          type: extractTypeAnnotation(left.typeAnnotation as any),
           optional: true,
           defaultValue: generateCodeFromNode(param.right),
         };
@@ -438,7 +535,7 @@ function extractParameters(params: t.Function['params']): FunctionParameter[] {
       if (t.isIdentifier(argument)) {
         return {
           name: `...${argument.name}`,
-          type: extractTypeAnnotation(argument.typeAnnotation),
+          type: extractTypeAnnotation(argument.typeAnnotation as any),
           optional: false,
         };
       }
