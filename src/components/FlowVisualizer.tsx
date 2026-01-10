@@ -18,12 +18,13 @@ import {
 import html2canvas from 'html2canvas';
 
 import FunctionNode from './FunctionNode';
+import SectionHeader from './SectionHeader';
 import FlowToolbar from './FlowToolbar';
 import NodeDetailsPanel from './NodeDetailsPanel';
 import StatsPanel from './StatsPanel';
 import LayoutControls from './LayoutControls';
 
-import { layoutNodes } from '../lib/layoutEngine';
+import { layoutNodes, createMatrixLayout } from '../lib/layoutEngine';
 import type { GraphData } from '../types';
 
 interface FlowVisualizerProps {
@@ -38,6 +39,7 @@ interface FlowVisualizerProps {
     parseTime?: number;
     url?: string;
   };
+  onBackToAnalysis?: () => void;
 }
 
 interface FilterOptions {
@@ -51,6 +53,7 @@ interface FilterOptions {
 
 const nodeTypes = {
   function: FunctionNode,
+  sectionHeader: SectionHeader,
 };
 
 const defaultEdgeOptions = {
@@ -59,7 +62,30 @@ const defaultEdgeOptions = {
   style: { strokeWidth: 2 },
 };
 
-const FlowVisualizerContent: React.FC<FlowVisualizerProps> = ({ data, metadata }) => {
+// Helper function to apply the correct layout based on type
+const applyLayoutByType = (
+  nodes: Node[], 
+  edges: Edge[], 
+  layoutType: 'dagre' | 'force' | 'circular' | 'grid',
+  layoutDirection: 'TB' | 'LR' | 'BT' | 'RL',
+  spacing: { nodeSpacing: number; rankSeparation: number; edgeSeparation: number }
+): Node[] => {
+  switch (layoutType) {
+    case 'grid':
+      return createMatrixLayout(nodes, edges, 5); // 5 columns per row
+    case 'dagre':
+    default:
+      return layoutNodes(nodes, edges, {
+        direction: layoutDirection,
+        nodeWidth: spacing.nodeSpacing,
+        nodeHeight: 80,
+        rankSep: spacing.rankSeparation,
+        nodeSep: spacing.nodeSpacing,
+      });
+  }
+};
+
+const FlowVisualizerContent: React.FC<FlowVisualizerProps> = ({ data, metadata, onBackToAnalysis }) => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { fitView, getViewport, setViewport } = useReactFlow();
   
@@ -76,7 +102,7 @@ const FlowVisualizerContent: React.FC<FlowVisualizerProps> = ({ data, metadata }
   
   // Layout state
   const [layoutDirection, setLayoutDirection] = useState<'TB' | 'LR' | 'BT' | 'RL'>('TB');
-  const [layoutType, setLayoutType] = useState<'dagre' | 'force' | 'circular' | 'grid'>('dagre');
+  const [layoutType, setLayoutType] = useState<'dagre' | 'force' | 'circular' | 'grid'>('grid');
   const [spacing, setSpacing] = useState({
     nodeSpacing: 100,
     rankSeparation: 150,
@@ -98,13 +124,7 @@ const FlowVisualizerContent: React.FC<FlowVisualizerProps> = ({ data, metadata }
   useEffect(() => {
     if (data.nodes && data.edges) {
       // Apply layout to initial data
-      const layoutedNodes = layoutNodes(data.nodes, data.edges, {
-        direction: layoutDirection,
-        nodeWidth: spacing.nodeSpacing,
-        nodeHeight: 80,
-        rankSep: spacing.rankSeparation,
-        nodeSep: spacing.nodeSpacing,
-      });
+      const layoutedNodes = applyLayoutByType(data.nodes, data.edges, layoutType, layoutDirection, spacing);
       
       setNodes(layoutedNodes);
       setEdges(data.edges);
@@ -114,7 +134,7 @@ const FlowVisualizerContent: React.FC<FlowVisualizerProps> = ({ data, metadata }
         fitView({ duration: 800 });
       }, 100);
     }
-  }, [data, layoutDirection, spacing, setNodes, setEdges, fitView]);
+  }, [data, layoutType, layoutDirection, spacing, setNodes, setEdges, fitView]);
 
   // Apply filters
   const filteredData = useMemo(() => {
@@ -194,6 +214,8 @@ const FlowVisualizerContent: React.FC<FlowVisualizerProps> = ({ data, metadata }
   const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     setSelectedNode(node);
     setShowDetailsPanel(true);
+    // Automatically switch to code tab if the node has source code available
+    setShowCodePreview((node.data as any)?.codePreview ? true : false);
   }, []);
 
   const handlePaneClick = useCallback(() => {
@@ -238,29 +260,17 @@ const FlowVisualizerContent: React.FC<FlowVisualizerProps> = ({ data, metadata }
 
   const handleResetLayout = useCallback(() => {
     if (autoLayout) {
-      const layoutedNodes = layoutNodes(nodes, edges, {
-        direction: layoutDirection,
-        nodeWidth: spacing.nodeSpacing,
-        nodeHeight: 80,
-        rankSep: spacing.rankSeparation,
-        nodeSep: spacing.nodeSpacing,
-      });
+      const layoutedNodes = applyLayoutByType(nodes, edges, layoutType, layoutDirection, spacing);
       setNodes(layoutedNodes);
       setTimeout(() => fitView({ duration: 800 }), 100);
     }
-  }, [nodes, edges, layoutDirection, spacing, autoLayout, setNodes, fitView]);
+  }, [nodes, edges, layoutType, layoutDirection, spacing, autoLayout, setNodes, fitView]);
 
   const handleApplyLayout = useCallback(() => {
-    const layoutedNodes = layoutNodes(nodes, edges, {
-      direction: layoutDirection,
-      nodeWidth: spacing.nodeSpacing,
-      nodeHeight: 80,
-      rankSep: spacing.rankSeparation,
-      nodeSep: spacing.nodeSpacing,
-    });
+    const layoutedNodes = applyLayoutByType(nodes, edges, layoutType, layoutDirection, spacing);
     setNodes(layoutedNodes);
     setTimeout(() => fitView({ duration: 800 }), 100);
-  }, [nodes, edges, layoutDirection, spacing, setNodes, fitView]);
+  }, [nodes, edges, layoutType, layoutDirection, spacing, setNodes, fitView]);
 
   const handleExportImage = useCallback(async (format: 'png' | 'svg') => {
     if (!reactFlowWrapper.current) return;
@@ -301,6 +311,7 @@ const FlowVisualizerContent: React.FC<FlowVisualizerProps> = ({ data, metadata }
         onLayoutChange={setLayoutDirection}
         onFilterChange={setFilters}
         onSearchChange={setSearchQuery}
+        onBackToAnalysis={onBackToAnalysis}
         showMinimap={showMinimap}
         showCodePreview={showCodePreview}
         layoutDirection={layoutDirection}
@@ -366,17 +377,80 @@ const FlowVisualizerContent: React.FC<FlowVisualizerProps> = ({ data, metadata }
             />
             
             {showMinimap && (
-              <MiniMap
-                position="top-right"
-                className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg"
-                maskColor="rgba(0, 0, 0, 0.1)"
-                nodeColor={(node) => {
-                  if ((node.data as any).isAsync) return '#8b5cf6';
-                  if ((node.data as any).isExported) return '#10b981';
-                  if ((node.data as any).category === 'method') return '#3b82f6';
-                  return '#6b7280';
-                }}
-              />
+              <>
+                <MiniMap
+                  position="top-right"
+                  className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg cursor-pointer hover:shadow-xl transition-shadow"
+                  maskColor="rgba(59, 130, 246, 0.15)"
+                  zoomable={true}
+                  pannable={true}
+                  nodeColor={(node) => {
+                    // Color-code nodes by type for better navigation
+                    const data = node.data as any;
+                    if (data.isHeader) return 'transparent'; // Hide section headers in minimap
+                    if (data.isAsync) return '#8b5cf6'; // Purple for async
+                    if (data.isExported) return '#10b981'; // Green for exported
+                    if (data.category === 'method') return '#3b82f6'; // Blue for methods
+                    if (data.label && data.label.includes('useCallback')) return '#f59e0b'; // Orange for useCallback
+                    if (data.label && data.label.includes('useEffect')) return '#ef4444'; // Red for useEffect
+                    if (data.label && data.label.includes('onClick')) return '#06b6d4'; // Cyan for JSX handlers
+                    return '#6b7280'; // Gray for regular functions
+                  }}
+                  nodeStrokeWidth={1}
+                  nodeStrokeColor={(node) => {
+                    // Add stroke for better visibility
+                    const data = node.data as any;
+                    if (data.isHeader) return 'transparent';
+                    return '#ffffff';
+                  }}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.95)',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '8px',
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                  }}
+                />
+                
+                {/* Minimap Color Legend */}
+                <div 
+                  className="fixed top-4 right-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg text-xs z-20 pointer-events-none"
+                  style={{ marginTop: '240px' }}
+                >
+                  <div className="p-2">
+                    <div className="font-medium text-gray-700 dark:text-gray-300 mb-2">Function Types:</div>
+                    <div className="space-y-1">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 rounded" style={{ backgroundColor: '#10b981' }}></div>
+                        <span className="text-gray-600 dark:text-gray-400">Exported</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 rounded" style={{ backgroundColor: '#8b5cf6' }}></div>
+                        <span className="text-gray-600 dark:text-gray-400">Async</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 rounded" style={{ backgroundColor: '#3b82f6' }}></div>
+                        <span className="text-gray-600 dark:text-gray-400">Methods</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 rounded" style={{ backgroundColor: '#f59e0b' }}></div>
+                        <span className="text-gray-600 dark:text-gray-400">useCallback</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 rounded" style={{ backgroundColor: '#ef4444' }}></div>
+                        <span className="text-gray-600 dark:text-gray-400">useEffect</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 rounded" style={{ backgroundColor: '#06b6d4' }}></div>
+                        <span className="text-gray-600 dark:text-gray-400">JSX Handlers</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 rounded" style={{ backgroundColor: '#6b7280' }}></div>
+                        <span className="text-gray-600 dark:text-gray-400">Regular</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
             )}
           </ReactFlow>
 

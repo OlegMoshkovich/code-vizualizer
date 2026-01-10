@@ -42,7 +42,8 @@ interface FunctionNodeProps extends NodeProps {
 const FunctionNode: React.FC<FunctionNodeProps> = ({ 
   data, 
   selected = false,
-  id 
+  id,
+  style 
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showCodePreview, setShowCodePreview] = useState(false);
@@ -122,16 +123,24 @@ const FunctionNode: React.FC<FunctionNodeProps> = ({
     navigator.clipboard.writeText(signature);
   };
 
-  // Calculate node width based on content
+  // Calculate node width based on content (consistent with layoutEngine)
   const calculateNodeWidth = () => {
     const labelWidth = Math.max(label.length * 8, 160);
     const paramWidth = parameters.length > 0 
       ? Math.max(...parameters.map(p => (p.name + p.type).length * 6)) + 40
       : 0;
-    return Math.min(Math.max(labelWidth, paramWidth, 200), 400);
+    
+    // Add badge space
+    let badgeWidth = 0;
+    if (isAsync) badgeWidth += 60;
+    if (isExported) badgeWidth += 70;
+    
+    return Math.min(Math.max(labelWidth, paramWidth, 200) + badgeWidth, 400);
   };
 
-  const nodeWidth = calculateNodeWidth();
+  // Use layout engine dimensions if available, otherwise calculate
+  const nodeWidth = (style?.width as number) || calculateNodeWidth();
+  const nodeHeight = style?.height as number;
 
   return (
     <div 
@@ -142,7 +151,11 @@ const FunctionNode: React.FC<FunctionNodeProps> = ({
         ${selected ? 'ring-2 ring-blue-500 ring-offset-2' : ''}
         min-w-48 max-w-96
       `}
-      style={{ width: nodeWidth }}
+      style={{ 
+        width: nodeWidth,
+        height: nodeHeight || 'auto',
+        minHeight: '120px' 
+      }}
     >
       {/* Top Handle - Functions that call this one */}
       <Handle

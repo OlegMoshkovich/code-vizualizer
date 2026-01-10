@@ -76,6 +76,7 @@ export function createFunctionNode(functionData: FunctionData): Node {
     documentation: functionData.documentation,
     location: functionData.location,
     sourceCode: generateSourcePreview(functionData),
+    codePreview: functionData.sourceCode, // Actual source code for preview
     
     // Additional metadata for styling and interaction
     complexity: calculateComplexity(functionData),

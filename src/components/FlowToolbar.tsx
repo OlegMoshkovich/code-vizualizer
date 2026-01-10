@@ -14,7 +14,8 @@ import {
   EyeOff,
   RefreshCw,
   Settings,
-  X
+  X,
+  ArrowLeft
 } from 'lucide-react';
 
 interface FlowToolbarProps {
@@ -28,6 +29,7 @@ interface FlowToolbarProps {
   onLayoutChange: (direction: 'TB' | 'LR' | 'BT' | 'RL') => void;
   onFilterChange: (filters: FilterOptions) => void;
   onSearchChange: (query: string) => void;
+  onBackToAnalysis?: () => void;
   showMinimap: boolean;
   showCodePreview: boolean;
   layoutDirection: 'TB' | 'LR' | 'BT' | 'RL';
@@ -55,6 +57,7 @@ const FlowToolbar: React.FC<FlowToolbarProps> = ({
   onLayoutChange,
   onFilterChange,
   onSearchChange,
+  onBackToAnalysis,
   showMinimap,
   showCodePreview,
   layoutDirection,
@@ -85,8 +88,20 @@ const FlowToolbar: React.FC<FlowToolbarProps> = ({
     <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 p-3">
       <div className="flex items-center justify-between flex-wrap gap-3">
         
-        {/* Left Section - Zoom and View Controls */}
+        {/* Left Section - Back Button and Zoom Controls */}
         <div className="flex items-center space-x-2">
+          {/* Back Button */}
+          {onBackToAnalysis && (
+            <button
+              onClick={onBackToAnalysis}
+              className="flex items-center space-x-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              title="Back to Analysis"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span className="text-sm font-medium">Back</span>
+            </button>
+          )}
+          
           <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
             <button
               onClick={onZoomOut}

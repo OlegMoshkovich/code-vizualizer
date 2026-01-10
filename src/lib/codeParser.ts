@@ -172,6 +172,7 @@ export function extractFunctions(ast: t.Node, sourceCode: string): FunctionData[
           async: node.async,
           exported: isExported(path),
           documentation: extractJSDoc(path, lines),
+          sourceCode: extractSourceCode(sourceCode, node.loc),
         }
       );
 
@@ -204,6 +205,7 @@ export function extractFunctions(ast: t.Node, sourceCode: string): FunctionData[
             async: isAsync,
             exported: isExported(path.parent),
             documentation: extractJSDoc(path, lines),
+            sourceCode: extractSourceCode(sourceCode, node.loc),
           }
         );
 
@@ -228,6 +230,7 @@ export function extractFunctions(ast: t.Node, sourceCode: string): FunctionData[
           async: node.async,
           exported: isClassExported(path),
           documentation: extractJSDoc(path, lines),
+          sourceCode: extractSourceCode(sourceCode, node.loc),
         }
       );
 
@@ -251,6 +254,7 @@ export function extractFunctions(ast: t.Node, sourceCode: string): FunctionData[
           async: node.async,
           exported: false, // Object methods are typically not directly exported
           documentation: extractJSDoc(path, lines),
+          sourceCode: extractSourceCode(sourceCode, node.loc),
         }
       );
 
@@ -279,10 +283,12 @@ export function extractFunctions(ast: t.Node, sourceCode: string): FunctionData[
           if (isHook && t.isIdentifier(node.callee)) {
             // For hooks, use the hook name + a counter or context
             const parent = path.parent;
-            if (t.isVariableDeclarator(parent) && t.isIdentifier(parent.id)) {
+            if (t.isVariableDeclarator(parent) && t.isIdentifier(parent.id) && t.isIdentifier(node.callee)) {
               functionName = `${parent.id.name} (${node.callee.name})`;
-            } else {
+            } else if (t.isIdentifier(node.callee)) {
               functionName = `anonymous (${node.callee.name})`;
+            } else {
+              functionName = 'anonymous callback';
             }
           } else if (t.isIdentifier(node.callee)) {
             functionName = `callback (${node.callee.name})`;
@@ -303,6 +309,7 @@ export function extractFunctions(ast: t.Node, sourceCode: string): FunctionData[
               async: firstArg.async,
               exported: false, // Callback functions are typically not exported
               documentation: extractJSDoc(path, lines),
+              sourceCode: extractSourceCode(sourceCode, firstArg.loc),
             }
           );
 
@@ -347,6 +354,7 @@ export function extractFunctions(ast: t.Node, sourceCode: string): FunctionData[
             async: expression.async,
             exported: false, // JSX handlers are not exported
             documentation: '', // JSX handlers typically don't have JSDoc
+            sourceCode: extractSourceCode(sourceCode, expression.loc),
           }
         );
 
@@ -382,40 +390,187 @@ export function extractFunctionCalls(ast: t.Node, functionNames: string[]): Func
       },
     },
 
-    // Track function calls
-    CallExpression(path) {
-      if (!currentFunction) return;
-
-      const callee = path.node.callee;
-      let calledFunction: string | null = null;
-
-      if (t.isIdentifier(callee)) {
-        // Direct function call: foo()
-        calledFunction = callee.name;
-      } else if (t.isMemberExpression(callee)) {
-        // Method call: obj.method() or this.method()
-        if (t.isIdentifier(callee.property)) {
-          if (t.isThisExpression(callee.object)) {
-            // this.method() - look for method in same class
-            const className = getClassName(path);
-            if (className) {
-              calledFunction = `${className}.${callee.property.name}`;
+    // Also track calls from CallExpression functions (useCallback, etc.)
+    CallExpression: {
+      enter(path) {
+        const node = path.node;
+        
+        // Check if this is a hook or function call that contains a function as argument
+        const hookNames = ['useCallback', 'useMemo', 'useEffect', 'useLayoutEffect'];
+        const isHook = t.isIdentifier(node.callee) && hookNames.includes(node.callee.name);
+        
+        if (isHook && node.arguments.length > 0) {
+          const firstArg = node.arguments[0];
+          
+          if (t.isArrowFunctionExpression(firstArg) || t.isFunctionExpression(firstArg)) {
+            // Get the name we would assign to this function
+            let functionName = '';
+            const parent = path.parent;
+            if (t.isVariableDeclarator(parent) && t.isIdentifier(parent.id) && t.isIdentifier(node.callee)) {
+              functionName = `${parent.id.name} (${node.callee.name})`;
+            } else if (t.isIdentifier(node.callee)) {
+              functionName = `anonymous (${node.callee.name})`;
+            } else {
+              functionName = 'anonymous callback';
             }
-          } else if (t.isIdentifier(callee.object)) {
-            // obj.method()
-            calledFunction = `${callee.object.name}.${callee.property.name}`;
+
+            // Set current function context for tracking calls within this function
+            const previousFunction = currentFunction;
+            currentFunction = functionName;
+            
+            // Continue traversing the function body to find calls
+            path.traverse({
+              CallExpression: {
+                enter(innerPath) {
+                  if (innerPath === path) return; // Skip self
+                  
+                  const callee = innerPath.node.callee;
+                  let calledFunction: string | null = null;
+
+                  if (t.isIdentifier(callee)) {
+                    calledFunction = callee.name;
+                  } else if (t.isMemberExpression(callee)) {
+                    if (t.isIdentifier(callee.property)) {
+                      if (t.isThisExpression(callee.object)) {
+                        const className = getClassName(innerPath);
+                        if (className) {
+                          calledFunction = `${className}.${callee.property.name}`;
+                        }
+                      } else if (t.isIdentifier(callee.object)) {
+                        calledFunction = `${callee.object.name}.${callee.property.name}`;
+                      }
+                    }
+                  }
+
+                  // Track the call if it's to a function defined in this file
+                  if (calledFunction && functionNames.includes(calledFunction)) {
+                    calls.push({
+                      caller: functionName,
+                      callee: calledFunction,
+                      lineNumber: innerPath.node.loc?.start.line || 0,
+                      columnNumber: innerPath.node.loc?.start.column,
+                    });
+                  }
+                }
+              }
+            });
+
+            // Restore previous function context
+            currentFunction = previousFunction;
+            return; // Skip normal CallExpression processing for this node
           }
         }
-      }
 
-      // Only track calls to functions defined in this file
-      if (calledFunction && functionNames.includes(calledFunction)) {
-        calls.push({
-          caller: currentFunction,
-          callee: calledFunction,
-          lineNumber: path.node.loc?.start.line || 0,
-          columnNumber: path.node.loc?.start.column,
+        // Normal call expression processing (when not inside a hook)
+        if (!currentFunction) return;
+
+        const callee = node.callee;
+        let calledFunction: string | null = null;
+
+        if (t.isIdentifier(callee)) {
+          calledFunction = callee.name;
+        } else if (t.isMemberExpression(callee)) {
+          if (t.isIdentifier(callee.property)) {
+            if (t.isThisExpression(callee.object)) {
+              const className = getClassName(path);
+              if (className) {
+                calledFunction = `${className}.${callee.property.name}`;
+              }
+            } else if (t.isIdentifier(callee.object)) {
+              calledFunction = `${callee.object.name}.${callee.property.name}`;
+            }
+          }
+        }
+
+        // Track the call if it's to a function defined in this file
+        if (calledFunction && functionNames.includes(calledFunction)) {
+          calls.push({
+            caller: currentFunction,
+            callee: calledFunction,
+            lineNumber: path.node.loc?.start.line || 0,
+            columnNumber: path.node.loc?.start.column,
+          });
+        }
+      }
+    },
+
+    // Track calls from JSX event handlers
+    JSXExpressionContainer(path) {
+      const expression = path.node.expression;
+      
+      if (t.isArrowFunctionExpression(expression) || t.isFunctionExpression(expression)) {
+        // Get JSX handler name
+        let functionName = 'JSX event handler';
+        const parent = path.parent;
+        if (t.isJSXAttribute(parent) && t.isJSXIdentifier(parent.name)) {
+          const jsxElement = path.findParent(p => t.isJSXElement(p.node));
+          if (jsxElement && t.isJSXElement(jsxElement.node)) {
+            const opening = jsxElement.node.openingElement;
+            if (t.isJSXIdentifier(opening.name)) {
+              functionName = `${opening.name.name}.${parent.name.name}`;
+            }
+          }
+        }
+
+        // Set current function context
+        const previousFunction = currentFunction;
+        currentFunction = functionName;
+        
+        // Traverse the JSX handler function to find calls
+        path.traverse({
+          CallExpression: {
+            enter(innerPath) {
+              const callee = innerPath.node.callee;
+              let calledFunction: string | null = null;
+
+              if (t.isIdentifier(callee)) {
+                calledFunction = callee.name;
+              } else if (t.isMemberExpression(callee)) {
+                if (t.isIdentifier(callee.property)) {
+                  if (t.isIdentifier(callee.object)) {
+                    calledFunction = `${callee.object.name}.${callee.property.name}`;
+                  }
+                }
+              }
+
+              // Track the call if it's to a function defined in this file
+              if (calledFunction && functionNames.includes(calledFunction)) {
+                calls.push({
+                  caller: functionName,
+                  callee: calledFunction,
+                  lineNumber: innerPath.node.loc?.start.line || 0,
+                  columnNumber: innerPath.node.loc?.start.column,
+                });
+              }
+            }
+          }
         });
+
+        // Restore previous function context
+        currentFunction = previousFunction;
+      } else if (t.isIdentifier(expression)) {
+        // Direct function reference in JSX: <button onClick={handleClick}>
+        let functionName = 'JSX event handler';
+        const parent = path.parent;
+        if (t.isJSXAttribute(parent) && t.isJSXIdentifier(parent.name)) {
+          const jsxElement = path.findParent(p => t.isJSXElement(p.node));
+          if (jsxElement && t.isJSXElement(jsxElement.node)) {
+            const opening = jsxElement.node.openingElement;
+            if (t.isJSXIdentifier(opening.name)) {
+              functionName = `${opening.name.name}.${parent.name.name}`;
+            }
+          }
+        }
+
+        // This is a direct reference, so the JSX handler "calls" the referenced function
+        if (functionNames.includes(expression.name)) {
+          calls.push({
+            caller: functionName,
+            callee: expression.name,
+            lineNumber: path.node.loc?.start.line || 0,
+            columnNumber: path.node.loc?.start.column,
+          });
+        }
       }
     },
   });
@@ -474,6 +629,48 @@ export function extractImportsAndExports(ast: t.Node): { imports: string[]; expo
 }
 
 /**
+ * Extracts source code for a function using its location information
+ * @param sourceCode - The complete source code
+ * @param loc - Source location information
+ * @returns Extracted function source code
+ */
+function extractSourceCode(sourceCode: string, loc: t.SourceLocation | null): string | undefined {
+  if (!loc) return undefined;
+
+  const lines = sourceCode.split('\n');
+  const startLine = loc.start.line - 1; // Convert to 0-based index
+  const endLine = loc.end.line - 1;
+
+  if (startLine < 0 || endLine >= lines.length || startLine > endLine) {
+    return undefined;
+  }
+
+  if (startLine === endLine) {
+    // Single line function
+    const line = lines[startLine];
+    return line.substring(loc.start.column, loc.end.column);
+  } else {
+    // Multi-line function
+    const functionLines = [];
+    
+    // First line (from start column to end)
+    functionLines.push(lines[startLine].substring(loc.start.column));
+    
+    // Middle lines (complete lines)
+    for (let i = startLine + 1; i < endLine; i++) {
+      functionLines.push(lines[i]);
+    }
+    
+    // Last line (from start to end column)
+    if (endLine < lines.length) {
+      functionLines.push(lines[endLine].substring(0, loc.end.column));
+    }
+    
+    return functionLines.join('\n');
+  }
+}
+
+/**
  * Creates a FunctionData object from AST information
  */
 function createFunctionData(
@@ -485,6 +682,7 @@ function createFunctionData(
     async?: boolean;
     exported?: boolean;
     documentation?: string;
+    sourceCode?: string;
   } = {}
 ): FunctionData {
   return {
@@ -500,6 +698,7 @@ function createFunctionData(
     async: options.async || false,
     exported: options.exported || false,
     documentation: options.documentation,
+    sourceCode: options.sourceCode,
   };
 }
 

@@ -155,15 +155,12 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
         `}
         onClick={onClick}
       >
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-2xl font-bold">{value}</div>
-            <div className="text-sm font-medium">{title}</div>
-            {description && (
-              <div className="text-xs opacity-75 mt-1">{description}</div>
-            )}
-          </div>
-          <Icon className="w-6 h-6 opacity-75" />
+        <div className="w-full">
+          <div className="text-lg font-bold truncate">{value}</div>
+          <div className="text-xs font-medium truncate">{title}</div>
+          {description && (
+            <div className="text-xs opacity-75 mt-1 truncate">{description}</div>
+          )}
         </div>
       </div>
     );

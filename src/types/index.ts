@@ -37,6 +37,8 @@ export interface FunctionData {
   async?: boolean;
   /** JSDoc comment if present */
   documentation?: string;
+  /** Original source code of the function */
+  sourceCode?: string;
 }
 
 /**

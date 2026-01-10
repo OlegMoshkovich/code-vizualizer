@@ -107,30 +107,32 @@ function calculateNodeSize(node: Node, options: LayoutOptions): { width: number;
     return { width: baseWidth, height: baseHeight };
   }
 
-  // Calculate width based on content
+  // Calculate width based on content - matching FunctionNode component logic
   let width = baseWidth;
   let height = baseHeight;
 
-  // Factor in function name length
+  // Factor in function name length (matching FunctionNode calculateNodeWidth)
   if ((data as any).label) {
-    const nameLength = (data as any).label.length;
-    width = Math.max(width, nameLength * 8 + 40); // Rough character width estimation
+    const labelWidth = Math.max((data as any).label.length * 8, 160);
+    width = Math.max(width, labelWidth);
   }
 
-  // Factor in parameters
+  // Factor in parameters (matching FunctionNode logic)
   if ((data as any).parameters && Array.isArray((data as any).parameters)) {
     const paramCount = (data as any).parameters.length;
-    const longestParam = (data as any).parameters.reduce((longest: number, param: any) => {
-      const paramText = `${param.name}: ${param.type}`;
-      return paramText.length > longest ? paramText.length : longest;
-    }, 0);
-
-    // Adjust width for longest parameter
-    width = Math.max(width, longestParam * 7 + 40);
     
-    // Adjust height for parameter count
     if (paramCount > 0) {
-      height = Math.max(height, 60 + paramCount * 20);
+      const longestParam = (data as any).parameters.reduce((longest: number, param: any) => {
+        const paramText = `${param.name}${param.type}`;
+        return paramText.length > longest ? paramText.length : longest;
+      }, 0);
+
+      // Adjust width for longest parameter (matching FunctionNode)
+      const paramWidth = longestParam * 6 + 40;
+      width = Math.max(width, paramWidth);
+      
+      // Adjust height for parameter count + fixed sections (header, returns, etc.)
+      height = Math.max(height, 120 + paramCount * 25); // More accurate height calculation
     }
   }
 
@@ -139,19 +141,19 @@ function calculateNodeSize(node: Node, options: LayoutOptions): { width: number;
     width = Math.max(width, (data as any).returnType.length * 8 + 80);
   }
 
-  // Add extra space for async functions
+  // Add extra space for badges (async, exported)
+  let badgeWidth = 0;
   if ((data as any).isAsync) {
-    width += 60; // Space for "async" label
+    badgeWidth += 60; // Space for "async" badge
   }
-
-  // Add extra space for exported functions
   if ((data as any).isExported) {
-    width += 60; // Space for "export" label
+    badgeWidth += 70; // Space for "export" badge  
   }
+  width += badgeWidth;
 
-  // Set reasonable limits
-  width = Math.min(Math.max(width, 150), 400);
-  height = Math.min(Math.max(height, 80), 300);
+  // Set consistent limits (matching FunctionNode component)
+  width = Math.min(Math.max(width, 200), 400); // Min 200px, max 400px
+  height = Math.min(Math.max(height, 120), 300); // Min 120px for better proportions
 
   return { width, height };
 }
@@ -221,6 +223,178 @@ export function createCircularLayout(nodes: Node[], edges: Edge[]): Node[] {
 }
 
 /**
+ * Creates a matrix/grid layout with functions organized by type
+ * @param nodes - Array of React Flow nodes
+ * @param edges - Array of React Flow edges (not used for positioning but needed for consistency)
+ * @param columnsPerRow - Number of columns per row (default: 5)
+ * @returns Positioned nodes in organized matrix layout
+ */
+export function createMatrixLayout(nodes: Node[], edges: Edge[], columnsPerRow: number = 5): Node[] {
+  if (nodes.length === 0) return nodes;
+
+  const nodeWidth = 320; // Fixed width for consistent spacing
+  const nodeHeight = 180; // Fixed height for consistent spacing
+  const horizontalSpacing = 350; // Space between columns
+  const verticalSpacing = 200; // Space between rows
+  const startX = 50; // Starting X position
+  const startY = 50; // Starting Y position
+  const groupSpacing = 100; // Extra space between different function groups
+
+  // Organize nodes by function type with priority order
+  const organizedGroups = organizeNodesByType(nodes);
+  
+  let currentY = startY;
+  const positionedNodes: Node[] = [];
+
+  // Position each group with section headers
+  organizedGroups.forEach((group, groupIndex) => {
+    if (groupIndex > 0) {
+      currentY += groupSpacing; // Add extra space between groups
+    }
+
+    // Add a visual section header node (invisible but helps with organization)
+    if (group.nodes.length > 0) {
+      const headerNode: Node = {
+        id: `section-header-${group.type}`,
+        type: 'sectionHeader',
+        position: { x: startX, y: currentY - 50 },
+        data: {
+          label: group.title,
+          type: group.type,
+          count: group.nodes.length,
+          isHeader: true
+        },
+        style: {
+          width: columnsPerRow * horizontalSpacing - 50,
+          height: 40,
+          background: 'transparent',
+          border: 'none',
+        },
+        draggable: false,
+        selectable: false,
+      };
+      positionedNodes.push(headerNode);
+    }
+
+    group.nodes.forEach((node, index) => {
+      const row = Math.floor(index / columnsPerRow);
+      const col = index % columnsPerRow;
+      
+      const x = startX + col * horizontalSpacing;
+      const y = currentY + row * verticalSpacing;
+
+      positionedNodes.push({
+        ...node,
+        position: { x, y },
+        style: {
+          ...node.style,
+          width: nodeWidth,
+          height: nodeHeight,
+        },
+      });
+    });
+
+    // Update currentY for next group (account for rows used by this group)
+    const rowsUsed = Math.ceil(group.nodes.length / columnsPerRow);
+    currentY += rowsUsed * verticalSpacing;
+  });
+
+  return positionedNodes;
+}
+
+/**
+ * Organizes nodes by function type with logical grouping
+ * @param nodes - Array of React Flow nodes
+ * @returns Array of organized groups with metadata
+ */
+function organizeNodesByType(nodes: Node[]): Array<{ type: string; title: string; nodes: Node[] }> {
+  // Define the priority order for function types
+  const typeOrder = [
+    'exported',     // Exported functions (public API)
+    'async',        // Async functions  
+    'method',       // Class methods
+    'useCallback',  // React useCallback hooks
+    'useEffect',    // React useEffect hooks
+    'useMemo',      // React useMemo hooks
+    'useState',     // React useState hooks
+    'jsxHandler',   // JSX event handlers
+    'function',     // Regular functions
+    'other'         // Everything else
+  ];
+
+  // Group nodes by their primary type
+  const groups: { [key: string]: Node[] } = {};
+  
+  nodes.forEach(node => {
+    const data = node.data as any;
+    let primaryType = 'other';
+
+    // Determine primary type based on function characteristics
+    if (data.isExported) {
+      primaryType = 'exported';
+    } else if (data.isAsync) {
+      primaryType = 'async';
+    } else if (data.category === 'method' || (data.label && data.label.includes('.'))) {
+      primaryType = 'method';
+    } else if (data.label && data.label.includes('(useCallback)')) {
+      primaryType = 'useCallback';
+    } else if (data.label && data.label.includes('(useEffect)')) {
+      primaryType = 'useEffect';
+    } else if (data.label && data.label.includes('(useMemo)')) {
+      primaryType = 'useMemo';
+    } else if (data.label && data.label.includes('(useState)')) {
+      primaryType = 'useState';
+    } else if (data.label && (data.label.includes('.onClick') || data.label.includes('handler') || data.label.includes('Handler'))) {
+      primaryType = 'jsxHandler';
+    } else if (data.category === 'function' || !data.category) {
+      primaryType = 'function';
+    }
+
+    if (!groups[primaryType]) {
+      groups[primaryType] = [];
+    }
+    groups[primaryType].push(node);
+  });
+
+  // Sort nodes within each group alphabetically
+  Object.keys(groups).forEach(type => {
+    groups[type].sort((a, b) => {
+      const labelA = (a.data as any).label || '';
+      const labelB = (b.data as any).label || '';
+      return labelA.localeCompare(labelB);
+    });
+  });
+
+  // Create organized result with titles and preserve order
+  const organizedGroups: Array<{ type: string; title: string; nodes: Node[] }> = [];
+  
+  const typeTitles: { [key: string]: string } = {
+    'exported': '📤 Exported Functions',
+    'async': '⚡ Async Functions', 
+    'method': '🏗️ Class Methods',
+    'useCallback': '🔄 useCallback Hooks',
+    'useEffect': '🎯 useEffect Hooks',
+    'useMemo': '💾 useMemo Hooks',
+    'useState': '📊 useState Hooks',
+    'jsxHandler': '🖱️ JSX Event Handlers',
+    'function': '⚙️ Regular Functions',
+    'other': '📂 Other Functions'
+  };
+
+  typeOrder.forEach(type => {
+    if (groups[type] && groups[type].length > 0) {
+      organizedGroups.push({
+        type,
+        title: typeTitles[type] || '📂 Other Functions',
+        nodes: groups[type]
+      });
+    }
+  });
+
+  return organizedGroups;
+}
+
+/**
  * Automatically selects the best layout based on graph characteristics
  * @param nodes - Array of React Flow nodes
  * @param edges - Array of React Flow edges
@@ -243,19 +417,9 @@ export function autoLayout(nodes: Node[], edges: Edge[]): Node[] {
     }];
   }
 
-  // Small graphs - circular layout
-  if (nodeCount <= 6 && edgeCount <= 8) {
-    return createCircularLayout(nodes, edges);
-  }
-
-  // Wide graphs - prefer horizontal layout
-  const avgConnectionsPerNode = edgeCount / nodeCount;
-  if (avgConnectionsPerNode < 1.5 && nodeCount > 8) {
-    return createHorizontalLayout(nodes, edges);
-  }
-
-  // Default to hierarchical
-  return createHierarchicalLayout(nodes, edges);
+  // For multiple nodes, use matrix layout for compact view
+  // This gives a clean grid with 5 functions per row
+  return createMatrixLayout(nodes, edges, 5);
 }
 
 /**
