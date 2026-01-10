@@ -20,8 +20,8 @@ export const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
   direction: 'TB', // Top to Bottom
   nodeWidth: 450,
   nodeHeight: 180,
-  rankSep: 150, // Separation between ranks
-  nodeSep: 80,  // Separation between nodes in same rank
+  rankSep: 180, // Increased separation between ranks
+  nodeSep: 120,  // Increased separation between nodes in same rank
 };
 
 /**
@@ -242,8 +242,8 @@ export function createMatrixLayout(nodes: Node[], edges: Edge[], columnsPerRow: 
 
   const nodeWidth = 500; // Much larger width for clean appearance
   const nodeHeight = 250; // Much larger height for clean appearance
-  const horizontalSpacing = 650; // Extra generous spacing to accommodate async functions
-  const verticalSpacing = 300; // More generous spacing between rows
+  const horizontalSpacing = 850; // Much larger spacing to prevent async function overlap
+  const verticalSpacing = 350; // More generous spacing between rows
   const startX = 50; // Starting X position
   const startY = 50; // Starting Y position
   const groupSpacing = 100; // Extra space between different function groups

@@ -15,7 +15,9 @@ import {
   RefreshCw,
   Settings,
   X,
-  ArrowLeft
+  ArrowLeft,
+  PanelLeftClose,
+  PanelLeftOpen
 } from 'lucide-react';
 
 interface FlowToolbarProps {
@@ -26,12 +28,14 @@ interface FlowToolbarProps {
   onExportImage: (format: 'png' | 'svg') => void;
   onToggleMinimap: () => void;
   onToggleCodePreview: () => void;
+  onToggleLeftSidebar: () => void;
   onLayoutChange: (direction: 'TB' | 'LR' | 'BT' | 'RL') => void;
   onFilterChange: (filters: FilterOptions) => void;
   onSearchChange: (query: string) => void;
   onBackToAnalysis?: () => void;
   showMinimap: boolean;
   showCodePreview: boolean;
+  isLeftSidebarVisible: boolean;
   layoutDirection: 'TB' | 'LR' | 'BT' | 'RL';
   filters: FilterOptions;
   isExporting?: boolean;
@@ -54,12 +58,14 @@ const FlowToolbar: React.FC<FlowToolbarProps> = ({
   onExportImage,
   onToggleMinimap,
   onToggleCodePreview,
+  onToggleLeftSidebar,
   onLayoutChange,
   onFilterChange,
   onSearchChange,
   onBackToAnalysis,
   showMinimap,
   showCodePreview,
+  isLeftSidebarVisible,
   layoutDirection,
   filters,
   isExporting = false
@@ -133,6 +139,20 @@ const FlowToolbar: React.FC<FlowToolbarProps> = ({
           >
             <RefreshCw className="w-4 h-4" />
             <span className="text-sm">Reset</span>
+          </button>
+
+          {/* Left Sidebar Toggle */}
+          <button
+            onClick={onToggleLeftSidebar}
+            className="flex items-center space-x-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            title={isLeftSidebarVisible ? "Hide Left Panel" : "Show Left Panel"}
+          >
+            {isLeftSidebarVisible ? (
+              <PanelLeftClose className="w-4 h-4" />
+            ) : (
+              <PanelLeftOpen className="w-4 h-4" />
+            )}
+            <span className="text-sm">{isLeftSidebarVisible ? "Hide" : "Show"}</span>
           </button>
         </div>
 

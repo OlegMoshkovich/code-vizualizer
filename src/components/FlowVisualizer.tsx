@@ -72,7 +72,7 @@ const applyLayoutByType = (
 ): Node[] => {
   switch (layoutType) {
     case 'grid':
-      return createMatrixLayout(nodes, edges, 5); // 5 columns per row
+      return createMatrixLayout(nodes, edges, 4); // 4 columns per row to accommodate wider async functions
     case 'dagre':
     default:
       return layoutNodes(nodes, edges, {
@@ -109,6 +109,11 @@ const FlowVisualizerContent: React.FC<FlowVisualizerProps> = ({ data, metadata, 
     edgeSeparation: 20,
   });
   const [autoLayout, setAutoLayout] = useState(true);
+  
+  // Sidebar resize state
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState(320); // Default width (w-80 = 320px)
+  const [isResizingLeftSidebar, setIsResizingLeftSidebar] = useState(false);
+  const [isLeftSidebarVisible, setIsLeftSidebarVisible] = useState(true);
   
   // Filter state
   const [filters, setFilters] = useState<FilterOptions>({
@@ -297,6 +302,47 @@ const FlowVisualizerContent: React.FC<FlowVisualizerProps> = ({ data, metadata, 
     }
   }, []);
 
+  // Left sidebar resize functionality
+  const handleLeftSidebarMouseDown = useCallback((e: React.MouseEvent) => {
+    setIsResizingLeftSidebar(true);
+    e.preventDefault();
+  }, []);
+
+  const handleLeftSidebarMouseMove = useCallback((e: MouseEvent) => {
+    if (!isResizingLeftSidebar) return;
+    
+    const newWidth = e.clientX;
+    const minWidth = 250; // Minimum width
+    const maxWidth = Math.min(window.innerWidth * 0.5, 600); // Maximum width (50% of screen or 600px)
+    
+    setLeftSidebarWidth(Math.max(minWidth, Math.min(newWidth, maxWidth)));
+  }, [isResizingLeftSidebar]);
+
+  const handleLeftSidebarMouseUp = useCallback(() => {
+    setIsResizingLeftSidebar(false);
+  }, []);
+
+  const toggleLeftSidebar = useCallback(() => {
+    setIsLeftSidebarVisible(!isLeftSidebarVisible);
+  }, [isLeftSidebarVisible]);
+
+  // Add global mouse event listeners for left sidebar resize
+  useEffect(() => {
+    if (isResizingLeftSidebar) {
+      document.addEventListener('mousemove', handleLeftSidebarMouseMove);
+      document.addEventListener('mouseup', handleLeftSidebarMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      
+      return () => {
+        document.removeEventListener('mousemove', handleLeftSidebarMouseMove);
+        document.removeEventListener('mouseup', handleLeftSidebarMouseUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      };
+    }
+  }, [isResizingLeftSidebar, handleLeftSidebarMouseMove, handleLeftSidebarMouseUp]);
+
   return (
     <div className="h-screen bg-gray-50 dark:bg-gray-900">
       {/* Toolbar */}
@@ -308,12 +354,14 @@ const FlowVisualizerContent: React.FC<FlowVisualizerProps> = ({ data, metadata, 
         onExportImage={handleExportImage}
         onToggleMinimap={() => setShowMinimap(!showMinimap)}
         onToggleCodePreview={() => setShowCodePreview(!showCodePreview)}
+        onToggleLeftSidebar={toggleLeftSidebar}
         onLayoutChange={setLayoutDirection}
         onFilterChange={setFilters}
         onSearchChange={setSearchQuery}
         onBackToAnalysis={onBackToAnalysis}
         showMinimap={showMinimap}
         showCodePreview={showCodePreview}
+        isLeftSidebarVisible={isLeftSidebarVisible}
         layoutDirection={layoutDirection}
         filters={filters}
         isExporting={isExporting}
@@ -321,7 +369,23 @@ const FlowVisualizerContent: React.FC<FlowVisualizerProps> = ({ data, metadata, 
 
       <div className="flex h-full">
         {/* Left Sidebar - Controls and Stats */}
-        <div className="w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
+        {isLeftSidebarVisible && (
+          <div 
+            className="bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto relative"
+            style={{ width: `${leftSidebarWidth}px` }}
+          >
+          {/* Resize Handle */}
+          <div
+            className={`absolute right-0 top-0 w-1 h-full cursor-col-resize hover:bg-blue-500 transition-colors z-10 ${
+              isResizingLeftSidebar ? 'bg-blue-500' : 'bg-transparent hover:bg-blue-300'
+            }`}
+            onMouseDown={handleLeftSidebarMouseDown}
+          >
+            {/* Resize grip indicator */}
+            <div className="absolute right-0 top-1/2 transform -translate-y-1/2 w-full h-8 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+              <div className="w-0.5 h-4 bg-blue-500 rounded-full"></div>
+            </div>
+          </div>
           <div className="p-4 space-y-6">
             {/* Stats Panel */}
             <StatsPanel
@@ -346,6 +410,7 @@ const FlowVisualizerContent: React.FC<FlowVisualizerProps> = ({ data, metadata, 
             />
           </div>
         </div>
+        )}
 
         {/* Main Flow Area */}
         <div className="flex-1 relative" ref={reactFlowWrapper}>
