@@ -260,8 +260,32 @@ const FlowVisualizerContent: React.FC<FlowVisualizerProps> = ({ data, metadata, 
   }, [getViewport, setViewport]);
 
   const handleFitView = useCallback(() => {
-    fitView({ duration: 800, padding: 0.1 });
-  }, [fitView]);
+    // Get the current visible nodes
+    const visibleNodes = displayData.nodes.filter(node => 
+      node.style?.opacity !== 0 && node.hidden !== true
+    );
+    
+    if (visibleNodes.length === 0) {
+      // If no visible nodes, fit to all nodes
+      fitView({ 
+        duration: 800, 
+        padding: 0.2,
+        includeHiddenNodes: false,
+        minZoom: 0.1,
+        maxZoom: 1.5
+      });
+    } else {
+      // Fit to visible nodes only
+      const nodeIds = visibleNodes.map(node => node.id);
+      fitView({ 
+        nodes: nodeIds,
+        duration: 800, 
+        padding: 0.2,
+        minZoom: 0.1,
+        maxZoom: 1.5
+      });
+    }
+  }, [fitView, displayData.nodes]);
 
   const handleResetLayout = useCallback(() => {
     if (autoLayout) {

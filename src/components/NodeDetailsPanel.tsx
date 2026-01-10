@@ -100,8 +100,19 @@ const NodeDetailsPanel: React.FC<NodeDetailsPanelProps> = ({
       : `#L${startLine}-L${endLine}`;
     
     // Handle different GitHub URL formats
-    if (sourceUrl.includes('github.com')) {
-      // Raw GitHub URLs: convert to blob view
+    if (sourceUrl.includes('github.com') || sourceUrl.includes('githubusercontent.com')) {
+      // Raw GitHub URLs from githubusercontent.com: convert to blob view
+      if (sourceUrl.includes('raw.githubusercontent.com')) {
+        // Convert: https://raw.githubusercontent.com/owner/repo/branch/path
+        // To: https://github.com/owner/repo/blob/branch/path
+        const rawMatch = sourceUrl.match(/raw\.githubusercontent\.com\/([^\/]+)\/([^\/]+)\/([^\/]+)\/(.+)/);
+        if (rawMatch) {
+          const [, owner, repo, ref, path] = rawMatch;
+          return `https://github.com/${owner}/${repo}/blob/${ref}/${path}${lineFragment}`;
+        }
+      }
+      
+      // Raw GitHub URLs from github.com/repo/raw/: convert to blob view
       if (sourceUrl.includes('/raw/')) {
         const blobUrl = sourceUrl.replace('/raw/', '/blob/');
         return `${blobUrl}${lineFragment}`;
@@ -114,11 +125,33 @@ const NodeDetailsPanel: React.FC<NodeDetailsPanelProps> = ({
         return `${cleanUrl}${lineFragment}`;
       }
       
-      // Handle other GitHub URLs by attempting conversion
-      const githubMatch = sourceUrl.match(/github\.com\/([^\/]+)\/([^\/]+)(?:\/(?:tree|blob)\/([^\/]+)\/)?(.+)/);
-      if (githubMatch) {
-        const [, owner, repo, branch = 'main', path] = githubMatch;
-        return `https://github.com/${owner}/${repo}/blob/${branch}/${path}${lineFragment}`;
+      // Handle GitHub repository URLs - improved pattern matching
+      // This regex handles: github.com/owner/repo, github.com/owner/repo/, github.com/owner/repo/blob/ref/path
+      const patterns = [
+        // Pattern 1: Full blob URLs with commit/branch and path
+        /github\.com\/([^\/]+)\/([^\/]+)\/blob\/([^\/]+)\/(.+)/,
+        // Pattern 2: Full tree URLs with commit/branch and path  
+        /github\.com\/([^\/]+)\/([^\/]+)\/tree\/([^\/]+)\/(.+)/,
+        // Pattern 3: Basic repo URLs with optional path
+        /github\.com\/([^\/]+)\/([^\/]+)\/?(.*)$/
+      ];
+      
+      for (const pattern of patterns) {
+        const match = sourceUrl.match(pattern);
+        if (match) {
+          const [, owner, repo, refOrPath, pathOrEmpty] = match;
+          
+          if (pattern === patterns[2]) {
+            // Basic repo URL - use 'main' as default branch
+            const path = refOrPath || 'README.md'; // Default to README if no path
+            return `https://github.com/${owner}/${repo}/blob/main/${path}${lineFragment}`;
+          } else {
+            // Full URL with ref and path
+            const ref = refOrPath;
+            const path = pathOrEmpty;
+            return `https://github.com/${owner}/${repo}/blob/${ref}/${path}${lineFragment}`;
+          }
+        }
       }
       
       // Fallback: just append line fragment

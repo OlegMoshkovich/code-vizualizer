@@ -248,6 +248,9 @@ export function createMatrixLayout(nodes: Node[], edges: Edge[], columnsPerRow: 
   const startY = 50; // Starting Y position
   const groupSpacing = 100; // Extra space between different function groups
 
+  // Generate a unique run ID for this layout execution
+  const layoutId = Math.random().toString(36).substr(2, 9);
+
   // Organize nodes by function type with priority order
   const organizedGroups = organizeNodesByType(nodes);
   
@@ -263,7 +266,7 @@ export function createMatrixLayout(nodes: Node[], edges: Edge[], columnsPerRow: 
     // Add a visual section header node (invisible but helps with organization)
     if (group.nodes.length > 0) {
       const headerNode: Node = {
-        id: `section-header-${group.type}`,
+        id: `section-header-${group.type}-${groupIndex}-${layoutId}`, // Make unique with layout ID
         type: 'sectionHeader',
         position: { x: startX, y: currentY - 50 },
         data: {
