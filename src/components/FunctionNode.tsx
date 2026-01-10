@@ -125,22 +125,29 @@ const FunctionNode: React.FC<FunctionNodeProps> = ({
 
   // Calculate node width based on content (consistent with layoutEngine)
   const calculateNodeWidth = () => {
-    const labelWidth = Math.max(label.length * 8, 160);
+    // Much more generous width calculation for clean appearance
+    const labelWidth = Math.max(label.length * 12, 300);
     const paramWidth = parameters.length > 0 
-      ? Math.max(...parameters.map(p => (p.name + p.type).length * 6)) + 40
+      ? Math.max(...parameters.map(p => (p.name + p.type).length * 8)) + 100
       : 0;
     
-    // Add badge space
+    // Add generous badge space
     let badgeWidth = 0;
-    if (isAsync) badgeWidth += 60;
-    if (isExported) badgeWidth += 70;
+    if (isAsync) badgeWidth += 120; // Extra width for async functions
+    if (isExported) badgeWidth += 100;
+    if (complexity && complexity > 3) badgeWidth += 100;
     
-    return Math.min(Math.max(labelWidth, paramWidth, 200) + badgeWidth, 400);
+    // Extra width specifically for async functions to accommodate longer names
+    const asyncExtraWidth = isAsync ? 80 : 0;
+    
+    // Much larger minimum and maximum widths for clean appearance
+    const baseWidth = Math.max(labelWidth, paramWidth, 400) + badgeWidth + asyncExtraWidth;
+    return Math.min(baseWidth, isAsync ? 800 : 700); // Higher max width for async functions
   };
 
   // Use layout engine dimensions if available, otherwise calculate
   const nodeWidth = (style?.width as number) || calculateNodeWidth();
-  const nodeHeight = style?.height as number;
+  const nodeHeight = (style?.height as number) || 180; // Default to 180px if no height provided
 
   return (
     <div 
@@ -149,12 +156,16 @@ const FunctionNode: React.FC<FunctionNodeProps> = ({
         border-2 rounded-lg shadow-lg hover:shadow-xl
         transition-all duration-200 ease-in-out
         ${selected ? 'ring-2 ring-blue-500 ring-offset-2' : ''}
-        min-w-48 max-w-96
+        overflow-hidden
       `}
       style={{ 
-        width: nodeWidth,
-        height: nodeHeight || 'auto',
-        minHeight: '120px' 
+        width: `${nodeWidth}px`,
+        height: `${nodeHeight}px`,
+        minWidth: `${nodeWidth}px`,
+        minHeight: `${nodeHeight}px`,
+        maxWidth: `${nodeWidth}px`,
+        maxHeight: `${nodeHeight}px`,
+        boxSizing: 'border-box'
       }}
     >
       {/* Top Handle - Functions that call this one */}

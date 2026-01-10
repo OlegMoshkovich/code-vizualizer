@@ -18,10 +18,10 @@ export interface LayoutOptions {
 
 export const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
   direction: 'TB', // Top to Bottom
-  nodeWidth: 250,
-  nodeHeight: 100,
-  rankSep: 100, // Separation between ranks
-  nodeSep: 50,  // Separation between nodes in same rank
+  nodeWidth: 450,
+  nodeHeight: 180,
+  rankSep: 150, // Separation between ranks
+  nodeSep: 80,  // Separation between nodes in same rank
 };
 
 /**
@@ -113,7 +113,7 @@ function calculateNodeSize(node: Node, options: LayoutOptions): { width: number;
 
   // Factor in function name length (matching FunctionNode calculateNodeWidth)
   if ((data as any).label) {
-    const labelWidth = Math.max((data as any).label.length * 8, 160);
+    const labelWidth = Math.max((data as any).label.length * 12, 300);
     width = Math.max(width, labelWidth);
   }
 
@@ -128,32 +128,40 @@ function calculateNodeSize(node: Node, options: LayoutOptions): { width: number;
       }, 0);
 
       // Adjust width for longest parameter (matching FunctionNode)
-      const paramWidth = longestParam * 6 + 40;
+      const paramWidth = longestParam * 8 + 100;
       width = Math.max(width, paramWidth);
       
       // Adjust height for parameter count + fixed sections (header, returns, etc.)
-      height = Math.max(height, 120 + paramCount * 25); // More accurate height calculation
+      height = Math.max(height, 180 + paramCount * 30); // More generous height calculation
     }
   }
 
   // Factor in return type
   if ((data as any).returnType && (data as any).returnType !== 'any') {
-    width = Math.max(width, (data as any).returnType.length * 8 + 80);
+    width = Math.max(width, (data as any).returnType.length * 12 + 120);
   }
 
-  // Add extra space for badges (async, exported)
+  // Add extra space for badges (async, exported, complex)
   let badgeWidth = 0;
   if ((data as any).isAsync) {
-    badgeWidth += 60; // Space for "async" badge
+    badgeWidth += 120; // Extra space for "async" badge
   }
   if ((data as any).isExported) {
-    badgeWidth += 70; // Space for "export" badge  
+    badgeWidth += 100; // Space for "export" badge  
+  }
+  if ((data as any).complexity && (data as any).complexity > 3) {
+    badgeWidth += 100; // Space for "complex" badge
   }
   width += badgeWidth;
 
-  // Set consistent limits (matching FunctionNode component)
-  width = Math.min(Math.max(width, 200), 400); // Min 200px, max 400px
-  height = Math.min(Math.max(height, 120), 300); // Min 120px for better proportions
+  // Extra width specifically for async functions to accommodate longer names
+  const asyncExtraWidth = (data as any).isAsync ? 80 : 0;
+  width += asyncExtraWidth;
+
+  // Set much more generous limits (matching FunctionNode component)
+  const maxWidth = (data as any).isAsync ? 800 : 700; // Higher max width for async functions
+  width = Math.min(Math.max(width, 400), maxWidth); // Min 400px, variable max
+  height = Math.min(Math.max(height, 180), 400); // Min 180px for clean appearance
 
   return { width, height };
 }
@@ -232,10 +240,10 @@ export function createCircularLayout(nodes: Node[], edges: Edge[]): Node[] {
 export function createMatrixLayout(nodes: Node[], edges: Edge[], columnsPerRow: number = 5): Node[] {
   if (nodes.length === 0) return nodes;
 
-  const nodeWidth = 320; // Fixed width for consistent spacing
-  const nodeHeight = 180; // Fixed height for consistent spacing
-  const horizontalSpacing = 350; // Space between columns
-  const verticalSpacing = 200; // Space between rows
+  const nodeWidth = 500; // Much larger width for clean appearance
+  const nodeHeight = 250; // Much larger height for clean appearance
+  const horizontalSpacing = 650; // Extra generous spacing to accommodate async functions
+  const verticalSpacing = 300; // More generous spacing between rows
   const startX = 50; // Starting X position
   const startY = 50; // Starting Y position
   const groupSpacing = 100; // Extra space between different function groups
@@ -283,13 +291,22 @@ export function createMatrixLayout(nodes: Node[], edges: Edge[], columnsPerRow: 
       const x = startX + col * horizontalSpacing;
       const y = currentY + row * verticalSpacing;
 
+      // Calculate individual node size (especially important for async functions)
+      const { width: calculatedWidth, height: calculatedHeight } = calculateNodeSize(node, {
+        direction: 'TB',
+        nodeWidth,
+        nodeHeight,
+        rankSep: 150,
+        nodeSep: 80,
+      });
+
       positionedNodes.push({
         ...node,
         position: { x, y },
         style: {
           ...node.style,
-          width: nodeWidth,
-          height: nodeHeight,
+          width: calculatedWidth,
+          height: calculatedHeight,
         },
       });
     });

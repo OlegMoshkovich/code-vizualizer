@@ -476,6 +476,7 @@ const FlowVisualizerContent: React.FC<FlowVisualizerProps> = ({ data, metadata, 
             onNavigateToNode={handleNavigateToNode}
             allNodes={nodes}
             allEdges={edges}
+            sourceUrl={metadata?.url}
           />
         )}
       </div>

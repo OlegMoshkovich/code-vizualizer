@@ -37,13 +37,28 @@ export const EDGE_TYPES = {
  * @returns Graph data ready for React Flow
  */
 export function buildReactFlowGraph(parsedData: ParsedCodeResult): GraphData {
-  // Create nodes from functions
-  const nodes = parsedData.functions.map(functionData => 
-    createFunctionNode(functionData)
-  );
+  // Track used names to ensure unique IDs
+  const usedNames = new Map<string, number>();
+  const functionToNodeId = new Map<string, string>();
+  
+  // Create nodes from functions with unique IDs and track mapping
+  const nodes = parsedData.functions.map((functionData, index) => {
+    const node = createFunctionNode(functionData, usedNames);
+    
+    // Create a unique key for this function occurrence using index
+    const functionKey = `${functionData.name}_${index}`;
+    functionToNodeId.set(functionKey, node.id);
+    
+    // Also map simple name to first occurrence for edge compatibility
+    if (!functionToNodeId.has(functionData.name)) {
+      functionToNodeId.set(functionData.name, node.id);
+    }
+    
+    return node;
+  });
 
   // Create edges from function calls
-  const edges = createFunctionEdges(parsedData.calls);
+  const edges = createFunctionEdges(parsedData.calls, functionToNodeId);
 
   // Apply automatic layout
   const layoutedNodes = autoLayout(nodes, edges);
@@ -57,14 +72,15 @@ export function buildReactFlowGraph(parsedData: ParsedCodeResult): GraphData {
 /**
  * Creates a React Flow node from function data
  * @param functionData - Function information from parser
+ * @param usedNames - Map to track used names for uniqueness
  * @returns React Flow compatible node
  */
-export function createFunctionNode(functionData: FunctionData): Node {
+export function createFunctionNode(functionData: FunctionData, usedNames?: Map<string, number>): Node {
   // Use a single node type for React Flow compatibility
   const nodeType = 'function';
 
-  // Create unique node ID
-  const nodeId = createNodeId(functionData.name);
+  // Create unique node ID with counter
+  const nodeId = createUniqueNodeId(functionData, usedNames);
 
   // Prepare node data
   const nodeData = {
@@ -96,9 +112,10 @@ export function createFunctionNode(functionData: FunctionData): Node {
 /**
  * Creates edges representing function call relationships
  * @param calls - Array of function calls from parser
+ * @param functionToNodeId - Optional mapping from function names to node IDs
  * @returns Array of React Flow compatible edges
  */
-export function createFunctionEdges(calls: FunctionCall[]): Edge[] {
+export function createFunctionEdges(calls: FunctionCall[], functionToNodeId?: Map<string, string>): Edge[] {
   // Group calls by caller-callee pairs to handle multiple calls
   const callGroups = groupCallsByRelationship(calls);
   
@@ -110,11 +127,15 @@ export function createFunctionEdges(calls: FunctionCall[]): Edge[] {
     const edgeType = 'smoothstep';
     const hasAsyncCall = callList.some(call => isAsyncCall(call));
 
+    // Get node IDs from mapping or fallback to name-based IDs
+    const sourceId = functionToNodeId?.get(caller) || createNodeId(caller);
+    const targetId = functionToNodeId?.get(callee) || createNodeId(callee);
+
     // Create edge
     const edge: Edge = {
       id: createEdgeId(caller, callee),
-      source: createNodeId(caller),
-      target: createNodeId(callee),
+      source: sourceId,
+      target: targetId,
       type: edgeType,
       animated: hasAsyncCall,
       style: getEdgeStyle(hasAsyncCall, callCount),
@@ -150,12 +171,37 @@ function groupCallsByRelationship(calls: FunctionCall[]): Map<string, FunctionCa
 }
 
 /**
- * Creates a unique node ID from function name
- * @param functionName - Name of the function
+ * Creates a unique node ID with counter for duplicates
+ * @param functionData - Function data containing name and location
+ * @param usedNames - Map to track used names for uniqueness
  * @returns Unique node identifier
  */
+function createUniqueNodeId(functionData: FunctionData, usedNames?: Map<string, number>): string {
+  const cleanName = functionData.name.replace(/[^a-zA-Z0-9]/g, '_');
+  
+  if (!usedNames) {
+    return `node-${cleanName}`;
+  }
+  
+  // Check if this name has been used before
+  const currentCount = usedNames.get(cleanName) || 0;
+  usedNames.set(cleanName, currentCount + 1);
+  
+  // If this is the first occurrence, don't add a suffix
+  if (currentCount === 0) {
+    return `node-${cleanName}`;
+  }
+  
+  // Add a counter suffix for duplicates
+  return `node-${cleanName}_${currentCount}`;
+}
+
+/**
+ * Creates a node ID from function name (legacy compatibility)
+ * @param functionName - Name of the function
+ * @returns Node identifier
+ */
 function createNodeId(functionName: string): string {
-  // Replace dots and special characters to create valid DOM IDs
   return `node-${functionName.replace(/[^a-zA-Z0-9]/g, '_')}`;
 }
 

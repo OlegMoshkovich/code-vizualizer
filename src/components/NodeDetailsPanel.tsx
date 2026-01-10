@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   X,
   Clipboard,
@@ -26,6 +26,7 @@ interface NodeDetailsPanelProps {
   onNavigateToNode: (nodeId: string) => void;
   allNodes: Node[];
   allEdges: any[];
+  sourceUrl?: string;
 }
 
 const NodeDetailsPanel: React.FC<NodeDetailsPanelProps> = ({
@@ -34,10 +35,23 @@ const NodeDetailsPanel: React.FC<NodeDetailsPanelProps> = ({
   onHighlightConnections,
   onNavigateToNode,
   allNodes,
-  allEdges
+  allEdges,
+  sourceUrl
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'code' | 'connections'>('overview');
   const [codeExpanded, setCodeExpanded] = useState(false);
+  const [panelWidth, setPanelWidth] = useState(384); // Default width (w-96 = 384px)
+  const [isResizing, setIsResizing] = useState(false);
+
+  // Automatically switch to code tab if the selected node has source code
+  useEffect(() => {
+    if (selectedNode?.data && (selectedNode.data as any).codePreview) {
+      setActiveTab('code');
+    } else {
+      setActiveTab('overview');
+    }
+  }, [selectedNode]);
+
 
   const handleCopySignature = useCallback(() => {
     if (!selectedNode?.data) return;
@@ -72,6 +86,100 @@ const NodeDetailsPanel: React.FC<NodeDetailsPanelProps> = ({
     return { callers, callees };
   }, [selectedNode, allNodes, allEdges]);
 
+  // Generate GitHub URL for the function location
+  const getGitHubUrl = useCallback(() => {
+    if (!sourceUrl || !selectedNode?.data?.location) return null;
+    
+    const location = (selectedNode.data as any).location;
+    const startLine = location.startLine;
+    const endLine = location.endLine;
+    
+    // Create line fragment
+    const lineFragment = startLine === endLine 
+      ? `#L${startLine}`
+      : `#L${startLine}-L${endLine}`;
+    
+    // Handle different GitHub URL formats
+    if (sourceUrl.includes('github.com')) {
+      // Raw GitHub URLs: convert to blob view
+      if (sourceUrl.includes('/raw/')) {
+        const blobUrl = sourceUrl.replace('/raw/', '/blob/');
+        return `${blobUrl}${lineFragment}`;
+      }
+      
+      // Already a blob URL
+      if (sourceUrl.includes('/blob/')) {
+        // Remove existing line fragment if present
+        const cleanUrl = sourceUrl.replace(/#L\d+(-L\d+)?$/, '');
+        return `${cleanUrl}${lineFragment}`;
+      }
+      
+      // Handle other GitHub URLs by attempting conversion
+      const githubMatch = sourceUrl.match(/github\.com\/([^\/]+)\/([^\/]+)(?:\/(?:tree|blob)\/([^\/]+)\/)?(.+)/);
+      if (githubMatch) {
+        const [, owner, repo, branch = 'main', path] = githubMatch;
+        return `https://github.com/${owner}/${repo}/blob/${branch}/${path}${lineFragment}`;
+      }
+      
+      // Fallback: just append line fragment
+      return `${sourceUrl}${lineFragment}`;
+    }
+    
+    return null;
+  }, [sourceUrl, selectedNode]);
+
+  const handleOpenInGitHub = useCallback(() => {
+    const githubUrl = getGitHubUrl();
+    if (githubUrl) {
+      window.open(githubUrl, '_blank', 'noopener,noreferrer');
+    } else if (sourceUrl) {
+      // Fallback: open the original source URL
+      window.open(sourceUrl, '_blank', 'noopener,noreferrer');
+    }
+  }, [getGitHubUrl, sourceUrl]);
+
+  // Check if we have any URL to open (GitHub or fallback)
+  const hasClickableUrl = useCallback(() => {
+    return getGitHubUrl() || sourceUrl;
+  }, [getGitHubUrl, sourceUrl]);
+
+  // Resize functionality
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    setIsResizing(true);
+    e.preventDefault();
+  }, []);
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isResizing) return;
+    
+    const newWidth = window.innerWidth - e.clientX;
+    const minWidth = 320; // Minimum width
+    const maxWidth = Math.min(window.innerWidth * 0.8, 800); // Maximum width (80% of screen or 800px)
+    
+    setPanelWidth(Math.max(minWidth, Math.min(newWidth, maxWidth)));
+  }, [isResizing]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  // Add global mouse event listeners for resize
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      };
+    }
+  }, [isResizing, handleMouseMove, handleMouseUp]);
+
   if (!selectedNode) return null;
 
   const data = selectedNode.data as any;
@@ -95,7 +203,25 @@ const NodeDetailsPanel: React.FC<NodeDetailsPanelProps> = ({
   ] as const;
 
   return (
-    <div className="fixed right-0 top-0 h-full w-96 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shadow-2xl z-50 overflow-hidden flex flex-col">
+    <div 
+      className="fixed right-0 top-0 h-full bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shadow-2xl z-50 overflow-hidden flex flex-col"
+      style={{ width: `${panelWidth}px` }}
+    >
+      {/* Resize Handle */}
+      <div
+        className={`absolute left-0 top-0 w-2 h-full cursor-col-resize transition-all z-10 group ${
+          isResizing ? 'bg-blue-500' : 'bg-transparent hover:bg-blue-200 dark:hover:bg-blue-800'
+        }`}
+        onMouseDown={handleMouseDown}
+      >
+        {/* Resize grip indicator */}
+        <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="w-0.5 h-4 bg-blue-500 rounded-full"></div>
+        </div>
+      </div>
+      
+      {/* Panel Content */}
+      <div className="flex-1 flex flex-col">
       
       {/* Header */}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
@@ -267,16 +393,31 @@ const NodeDetailsPanel: React.FC<NodeDetailsPanelProps> = ({
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
                   Source Location
                 </h3>
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
-                  <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
-                    <MapPin className="w-4 h-4" />
-                    <span>
-                      Lines {data.location.startLine}-{data.location.endLine}
-                      {data.location.startColumn && (
-                        <>, Columns {data.location.startColumn}-{data.location.endColumn}</>
-                      )}
-                    </span>
+                <div 
+                  className={`bg-gray-50 dark:bg-gray-800 rounded-lg p-3 ${
+                    hasClickableUrl() ? 'hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors' : ''
+                  }`}
+                  onClick={hasClickableUrl() ? handleOpenInGitHub : undefined}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                      <MapPin className="w-4 h-4" />
+                      <span>
+                        Lines {data.location.startLine}-{data.location.endLine}
+                        {data.location.startColumn && (
+                          <>, Columns {data.location.startColumn}-{data.location.endColumn}</>
+                        )}
+                      </span>
+                    </div>
+                    {hasClickableUrl() && (
+                      <ExternalLink className="w-4 h-4 text-blue-500 hover:text-blue-600" />
+                    )}
                   </div>
+                  {hasClickableUrl() && (
+                    <div className="mt-1 text-xs text-blue-600 dark:text-blue-400">
+                      {getGitHubUrl() ? 'Click to view on GitHub' : 'Click to view source'}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -356,7 +497,7 @@ const NodeDetailsPanel: React.FC<NodeDetailsPanelProps> = ({
                 
                 <div className="bg-gray-900 dark:bg-gray-800 rounded-lg overflow-hidden">
                   <pre className={`text-sm text-gray-100 p-4 overflow-auto ${
-                    codeExpanded ? 'max-h-none' : 'max-h-48'
+                    codeExpanded ? 'max-h-none' : 'max-h-96'
                   }`}>
                     <code>{data.codePreview}</code>
                   </pre>
@@ -454,6 +595,7 @@ const NodeDetailsPanel: React.FC<NodeDetailsPanelProps> = ({
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   );
