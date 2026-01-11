@@ -560,11 +560,11 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
     onClick?: () => void;
   }> = ({ title, value, icon: Icon, color, description, clickable, onClick }) => {
     const colorClasses = {
-      blue: 'bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800',
-      green: 'bg-green-50 dark:bg-green-950 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800',
-      purple: 'bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800',
-      orange: 'bg-orange-50 dark:bg-orange-950 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800',
-      red: 'bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800',
+      blue: 'bg-gray-50 dark:bg-gray-900 text-black dark:text-white border-gray-300 dark:border-gray-600',
+      green: 'bg-gray-100 dark:bg-gray-800 text-black dark:text-white border-gray-400 dark:border-gray-500',
+      purple: 'bg-white dark:bg-black text-black dark:text-white border-gray-500 dark:border-gray-400',
+      orange: 'bg-gray-200 dark:bg-gray-700 text-black dark:text-white border-gray-600 dark:border-gray-300',
+      red: 'bg-gray-300 dark:bg-gray-600 text-black dark:text-white border-gray-700 dark:border-gray-200',
       gray: 'bg-gray-50 dark:bg-gray-950 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-800'
     };
     
@@ -593,8 +593,8 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-3">
-          <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-            <BarChart3 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+            <BarChart3 className="w-5 h-5 text-black dark:text-white" />
           </div>
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -611,7 +611,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
         {metadata?.url && (
           <button
             onClick={() => window.open(metadata.url, '_blank')}
-            className="flex items-center space-x-2 px-3 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors"
+            className="flex items-center space-x-2 px-3 py-2 text-sm text-black dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
           >
             <ExternalLink className="w-4 h-4" />
             <span>View Source</span>
@@ -848,12 +848,12 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
           <div className="space-y-3">
             {/* Critical Issues */}
             {stats.hasCircularDeps && (
-              <div className="p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg">
-                <div className="flex items-start space-x-2 text-sm text-red-700 dark:text-red-300">
+              <div className="p-3 bg-gray-300 dark:bg-gray-600 border border-gray-400 dark:border-gray-500 rounded-lg">
+                <div className="flex items-start space-x-2 text-sm text-black dark:text-white">
                   <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                   <div>
                     <div className="font-medium">Circular Dependencies Detected</div>
-                    <div className="text-xs mt-1 text-red-600 dark:text-red-400">
+                    <div className="text-xs mt-1 text-gray-700 dark:text-gray-300">
                       Critical: This can cause infinite loops and make testing difficult. Consider using dependency injection or refactoring to break cycles.
                     </div>
                   </div>
@@ -878,12 +878,12 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
             
             {/* Duplicate Names */}
             {stats.duplicateNames.length > 0 && (
-              <div className="p-3 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-lg">
+              <div className="p-3 bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg">
                 <div className="flex items-start space-x-2 text-sm text-orange-700 dark:text-orange-300">
                   <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                   <div>
                     <div className="font-medium">{stats.duplicateNames.length} Functions with Duplicate Names</div>
-                    <div className="text-xs mt-1 text-orange-600 dark:text-orange-400">
+                    <div className="text-xs mt-1 text-gray-700 dark:text-gray-300">
                       This can cause confusion and bugs. Consider using more descriptive names or namespacing.
                     </div>
                   </div>
@@ -893,12 +893,12 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
             
             {/* Parameter Issues */}
             {stats.longParameterFunctions > 0 && (
-              <div className="p-3 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+              <div className="p-3 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
                 <div className="flex items-start space-x-2 text-sm text-yellow-700 dark:text-yellow-300">
                   <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                   <div>
                     <div className="font-medium">{stats.longParameterFunctions} Functions with Long Parameter Lists</div>
-                    <div className="text-xs mt-1 text-yellow-600 dark:text-yellow-400">
+                    <div className="text-xs mt-1 text-gray-700 dark:text-gray-300">
                       Functions with &gt;5 parameters are hard to use and test. Consider using objects or the builder pattern.
                     </div>
                   </div>
@@ -908,12 +908,12 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
             
             {/* Complexity Issues */}
             {stats.complex > 0 && (
-              <div className="p-3 bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 rounded-lg">
+              <div className="p-3 bg-white dark:bg-black border border-gray-400 dark:border-gray-500 rounded-lg">
                 <div className="flex items-start space-x-2 text-sm text-purple-700 dark:text-purple-300">
                   <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                   <div>
                     <div className="font-medium">{stats.complex} High Complexity Functions</div>
-                    <div className="text-xs mt-1 text-purple-600 dark:text-purple-400">
+                    <div className="text-xs mt-1 text-gray-700 dark:text-gray-300">
                       Complex functions are harder to understand and maintain. Consider breaking them into smaller functions.
                     </div>
                   </div>
@@ -923,12 +923,12 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
             
             {/* Refactoring Opportunities */}
             {stats.similarFunctions > 0 && (
-              <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <div className="p-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg">
                 <div className="flex items-start space-x-2 text-sm text-blue-700 dark:text-blue-300">
                   <TrendingUp className="w-4 h-4 mt-0.5 flex-shrink-0" />
                   <div>
                     <div className="font-medium">{stats.similarFunctions} Potential Refactoring Opportunities</div>
-                    <div className="text-xs mt-1 text-blue-600 dark:text-blue-400">
+                    <div className="text-xs mt-1 text-gray-700 dark:text-gray-300">
                       Similar functions detected. Consider extracting common logic to reduce duplication.
                     </div>
                   </div>
@@ -938,12 +938,12 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
             
             {/* General Performance */}
             {stats.isolated > 0 && (
-              <div className="p-3 bg-indigo-50 dark:bg-indigo-950 border border-indigo-200 dark:border-indigo-800 rounded-lg">
+              <div className="p-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg">
                 <div className="flex items-start space-x-2 text-sm text-indigo-700 dark:text-indigo-300">
                   <Clock className="w-4 h-4 mt-0.5 flex-shrink-0" />
                   <div>
                     <div className="font-medium">Code Organization Recommendation</div>
-                    <div className="text-xs mt-1 text-indigo-600 dark:text-indigo-400">
+                    <div className="text-xs mt-1 text-gray-700 dark:text-gray-300">
                       {stats.isolated} isolated functions could be grouped into modules or utilities for better organization.
                     </div>
                   </div>
@@ -1008,7 +1008,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({
           </div>
           
           {claudePrompts.length > 0 && (
-            <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg">
               <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2 flex items-center">
                 <Award className="w-4 h-4 mr-2" />
                 How to Use These Prompts

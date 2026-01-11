@@ -94,10 +94,6 @@ const FlowToolbar: React.FC<FlowToolbarProps> = ({
   }, [filters, onFilterChange]);
 
   const layoutOptions = [
-    { value: 'TB', label: 'Top → Bottom', icon: '↓' },
-    { value: 'LR', label: 'Left → Right', icon: '→' },
-    { value: 'BT', label: 'Bottom → Top', icon: '↑' },
-    { value: 'RL', label: 'Right → Left', icon: '←' },
     { value: 'CONNECTED', label: 'Connected Groups', icon: '🔗' }
   ] as const;
 
@@ -145,7 +141,7 @@ const FlowToolbar: React.FC<FlowToolbarProps> = ({
 
           <button
             onClick={onResetLayout}
-            className="flex items-center space-x-2 px-3 py-2 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
+            className="flex items-center space-x-2 px-3 py-2 bg-gray-200 dark:bg-gray-700 text-black dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
             title="Reset Layout"
           >
             <RefreshCw className="w-4 h-4" />
@@ -192,43 +188,18 @@ const FlowToolbar: React.FC<FlowToolbarProps> = ({
         {/* Right Section - Controls and Options */}
         <div className="flex items-center space-x-2">
           
-          {/* Layout Direction */}
-          <div className="relative">
-            <button
-              onClick={() => setShowLayoutControls(!showLayoutControls)}
-              className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
-                showLayoutControls
-                  ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-              }`}
-              title="Layout Direction"
-            >
-              <Settings className="w-4 h-4" />
-              <span className="text-sm">{layoutDirection === 'CONNECTED' ? '🔗' : layoutDirection}</span>
-            </button>
-            
-            {showLayoutControls && (
-              <div className="absolute top-full right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 min-w-40">
-                {layoutOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => {
-                      onLayoutChange(option.value);
-                      setShowLayoutControls(false);
-                    }}
-                    className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 first:rounded-t-lg last:rounded-b-lg flex items-center justify-between ${
-                      layoutDirection === option.value
-                        ? 'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
-                        : 'text-gray-700 dark:text-gray-300'
-                    }`}
-                  >
-                    <span>{option.label}</span>
-                    <span className="text-lg">{option.icon}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Connected Groups Toggle */}
+          <button
+            onClick={() => onLayoutChange(layoutDirection === 'CONNECTED' ? 'TB' : 'CONNECTED')}
+            className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
+              layoutDirection === 'CONNECTED'
+                ? 'bg-black text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+            title={layoutDirection === 'CONNECTED' ? 'Exit Connected Groups' : 'Show Connected Groups'}
+          >
+            🔗
+          </button>
 
           {/* Filters */}
           <div className="relative">
@@ -236,7 +207,7 @@ const FlowToolbar: React.FC<FlowToolbarProps> = ({
               onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
                 showFilters
-                  ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
+                  ? 'bg-gray-200 dark:bg-gray-600 text-black dark:text-white'
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
               }`}
               title="Filters"
@@ -369,7 +340,7 @@ const FlowToolbar: React.FC<FlowToolbarProps> = ({
                           })}
                           className="rounded w-3 h-3"
                         />
-                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <div className="w-2 h-2 bg-white rounded-full border border-gray-400"></div>
                         <span className="text-gray-700 dark:text-gray-300">Methods</span>
                       </label>
                       
@@ -382,7 +353,7 @@ const FlowToolbar: React.FC<FlowToolbarProps> = ({
                           })}
                           className="rounded w-3 h-3"
                         />
-                        <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+                        <div className="w-2 h-2 bg-gray-400 dark:bg-gray-600 rounded-full"></div>
                         <span className="text-gray-700 dark:text-gray-300">Regular</span>
                       </label>
                     </div>
@@ -428,7 +399,7 @@ const FlowToolbar: React.FC<FlowToolbarProps> = ({
               onClick={onToggleMinimap}
               className={`p-2 transition-colors ${
                 showMinimap
-                  ? 'bg-blue-500 text-white'
+                  ? 'bg-black text-white dark:bg-white dark:text-black'
                   : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
               }`}
               title={showMinimap ? 'Hide Minimap' : 'Show Minimap'}
@@ -440,7 +411,7 @@ const FlowToolbar: React.FC<FlowToolbarProps> = ({
               onClick={onToggleCodePreview}
               className={`p-2 transition-colors ${
                 showCodePreview
-                  ? 'bg-blue-500 text-white'
+                  ? 'bg-black text-white dark:bg-white dark:text-black'
                   : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
               }`}
               title={showCodePreview ? 'Hide Code Preview' : 'Show Code Preview'}
@@ -449,28 +420,6 @@ const FlowToolbar: React.FC<FlowToolbarProps> = ({
             </button>
           </div>
 
-          {/* Export */}
-          <div className="flex items-center space-x-1">
-            <button
-              onClick={() => onExportImage('png')}
-              disabled={isExporting}
-              className="flex items-center space-x-2 px-3 py-2 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Export as PNG"
-            >
-              <Download className="w-4 h-4" />
-              <span className="text-sm">PNG</span>
-            </button>
-            
-            <button
-              onClick={() => onExportImage('svg')}
-              disabled={isExporting}
-              className="flex items-center space-x-2 px-3 py-2 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Export as SVG"
-            >
-              <Download className="w-4 h-4" />
-              <span className="text-sm">SVG</span>
-            </button>
-          </div>
         </div>
       </div>
     </div>

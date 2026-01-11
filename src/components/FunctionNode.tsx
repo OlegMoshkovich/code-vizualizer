@@ -157,10 +157,10 @@ const FunctionNode: React.FC<FunctionNodeProps> = ({
     
     if (category === 'method') {
       return {
-        bg: 'bg-blue-50 dark:bg-blue-950',
-        border: 'border-blue-200 dark:border-blue-800',
-        header: 'bg-blue-100 dark:bg-blue-900',
-        text: 'text-blue-900 dark:text-blue-100'
+        bg: 'bg-white dark:bg-gray-950',
+        border: 'border-gray-300 dark:border-gray-600',
+        header: 'bg-gray-100 dark:bg-gray-800',
+        text: 'text-black dark:text-white'
       };
     }
     
@@ -310,7 +310,7 @@ const FunctionNode: React.FC<FunctionNodeProps> = ({
           <div className="space-y-1">
             {parameters.slice(0, isExpanded ? parameters.length : 3).map((param, index) => (
               <div key={index} className="flex items-center text-xs">
-                <span className="font-mono text-blue-600 dark:text-blue-400">
+                <span className="font-mono text-gray-700 dark:text-gray-300 font-semibold">
                   {param.name}
                 </span>
                 {param.optional && (
@@ -440,13 +440,13 @@ const FunctionNode: React.FC<FunctionNodeProps> = ({
                         onClick={() => {
                           navigator.clipboard.writeText(codePreview);
                         }}
-                        className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                        className="px-3 py-1 text-xs bg-black text-white dark:bg-white dark:text-black rounded hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors"
                       >
                         Copy Code
                       </button>
                       <button
                         onClick={() => setShowCodePreview(false)}
-                        className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+                        className="px-3 py-1 text-xs bg-gray-600 text-white dark:bg-gray-400 dark:text-black rounded hover:bg-gray-700 dark:hover:bg-gray-500 transition-colors"
                       >
                         Close
                       </button>
@@ -467,13 +467,13 @@ const FunctionNode: React.FC<FunctionNodeProps> = ({
           <div className="flex items-center justify-between pt-2">
             <button
               onClick={handleCopySignature}
-              className="flex items-center text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+              className="flex items-center text-xs text-gray-700 dark:text-gray-300 hover:text-black dark:hover:text-white"
             >
               <Clipboard className="w-3 h-3 mr-1" />
               Copy Signature
             </button>
             
-            <button className="flex items-center text-xs text-blue-600 dark:text-blue-400 hover:underline">
+            <button className="flex items-center text-xs text-gray-700 dark:text-gray-300 hover:underline">
               <ExternalLink className="w-3 h-3 mr-1" />
               View Source
             </button>
