@@ -10,7 +10,8 @@ import {
   Settings, 
   FileText, 
   ExternalLink,
-  Clipboard 
+  Clipboard,
+  X
 } from 'lucide-react';
 import type { FunctionParameter } from '../types';
 
@@ -37,7 +38,76 @@ interface FunctionNodeData extends Record<string, unknown> {
 
 interface FunctionNodeProps extends NodeProps {
   data: FunctionNodeData;
+  style?: React.CSSProperties;
 }
+
+// Helper function to generate descriptive text for functions
+const getFunctionDescription = (label: string, category: string, isAsync: boolean, isExported: boolean): string => {
+  const functionName = label.split('(')[0].trim();
+  
+  // React hooks
+  if (label.includes('(useCallback)') || /useCallback/i.test(functionName)) {
+    return 'Memoized callback function to prevent unnecessary re-renders';
+  }
+  if (label.includes('(useEffect)') || /useEffect/i.test(functionName)) {
+    return 'Side effect handler that runs after component renders';
+  }
+  if (label.includes('(useMemo)') || /useMemo/i.test(functionName)) {
+    return 'Memoized computation that only recalculates when dependencies change';
+  }
+  if (label.includes('(useState)') || /useState/i.test(functionName)) {
+    return 'State management hook for component-level state';
+  }
+  
+  // Event handlers
+  if (/^(on[A-Z]|handle[A-Z])/.test(functionName) || functionName.includes('Handler')) {
+    return 'Event handler function for user interactions';
+  }
+  
+  // Component functions
+  if (functionName.includes('Component') || /^render[A-Z]/.test(functionName)) {
+    return 'React component or rendering function';
+  }
+  
+  // Utility functions
+  if (/^(get|fetch|load)/.test(functionName)) {
+    return 'Data retrieval or loading function';
+  }
+  if (/^(set|update|save)/.test(functionName)) {
+    return 'Data modification or persistence function';
+  }
+  if (/^(validate|check|verify)/.test(functionName)) {
+    return 'Validation or verification function';
+  }
+  if (/^(format|parse|transform)/.test(functionName)) {
+    return 'Data formatting or transformation function';
+  }
+  if (/^(create|generate|build)/.test(functionName)) {
+    return 'Factory or builder function';
+  }
+  if (/^(init|setup|configure)/.test(functionName)) {
+    return 'Initialization or configuration function';
+  }
+  
+  // Category-based descriptions
+  if (category === 'method') {
+    return isAsync ? 'Asynchronous class method' : 'Class method for object operations';
+  }
+  
+  if (isAsync) {
+    if (isExported) {
+      return 'Exported asynchronous function for external use';
+    }
+    return 'Asynchronous function that handles promises or async operations';
+  }
+  
+  if (isExported) {
+    return 'Exported function available for external use';
+  }
+  
+  // Generic descriptions
+  return 'Function that performs specific business logic';
+};
 
 const FunctionNode: React.FC<FunctionNodeProps> = ({ 
   data, 
@@ -47,6 +117,7 @@ const FunctionNode: React.FC<FunctionNodeProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showCodePreview, setShowCodePreview] = useState(false);
+  const [isCodeFocused, setIsCodeFocused] = useState(false);
 
   const {
     label,
@@ -147,7 +218,7 @@ const FunctionNode: React.FC<FunctionNodeProps> = ({
 
   // Use layout engine dimensions if available, otherwise calculate
   const nodeWidth = (style?.width as number) || calculateNodeWidth();
-  const nodeHeight = (style?.height as number) || 180; // Default to 180px if no height provided
+  const nodeHeight = (style?.height as number) || 300; // Increased to 300px to accommodate code preview
 
   return (
     <div 
@@ -277,6 +348,36 @@ const FunctionNode: React.FC<FunctionNodeProps> = ({
         </div>
       </div>
 
+      {/* Source Code Preview - Always visible */}
+      <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 flex-1 overflow-hidden">
+        <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+          Source:
+        </div>
+        <div 
+          className={`bg-gray-900 dark:bg-gray-950 rounded p-2 h-20 overflow-auto cursor-pointer transition-all duration-200 ${
+            isCodeFocused ? 'ring-2 ring-blue-500 ring-opacity-50' : 'hover:bg-gray-800'
+          }`}
+          tabIndex={0}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsCodeFocused(true);
+          }}
+          onBlur={() => setIsCodeFocused(false)}
+          onMouseDown={(e) => e.stopPropagation()}
+          onMouseUp={(e) => e.stopPropagation()}
+        >
+          <pre className="text-xs text-gray-200 whitespace-pre-wrap focus:outline-none">
+            <code>
+              {codePreview ? (
+                codePreview
+              ) : (
+                `// ${getFunctionDescription(label, category, isAsync, isExported)}\n// Source code not available`
+              )}
+            </code>
+          </pre>
+        </div>
+      </div>
+
       {/* Expanded Content */}
       {isExpanded && (
         <div className="px-3 py-2 space-y-2">
@@ -294,7 +395,7 @@ const FunctionNode: React.FC<FunctionNodeProps> = ({
             </div>
           )}
           
-          {/* Code Preview Toggle */}
+          {/* Full Code View Toggle */}
           {codePreview && (
             <div>
               <button
@@ -302,15 +403,56 @@ const FunctionNode: React.FC<FunctionNodeProps> = ({
                 className="flex items-center text-xs text-blue-600 dark:text-blue-400 hover:underline"
               >
                 <FileText className="w-3 h-3 mr-1" />
-                {showCodePreview ? 'Hide' : 'Show'} Code
+                {showCodePreview ? 'Hide' : 'Show'} Full Code
               </button>
               
               {showCodePreview && (
-                <div className="mt-2 p-2 bg-gray-900 dark:bg-gray-800 rounded text-xs">
-                  <pre className="text-gray-100 overflow-x-auto">
-                    <code>{codePreview}</code>
-                  </pre>
-                </div>
+                <>
+                  {/* Backdrop */}
+                  <div 
+                    className="fixed inset-0 bg-black bg-opacity-50 z-40"
+                    onClick={() => setShowCodePreview(false)}
+                  />
+                  
+                  {/* Modal */}
+                  <div className="fixed inset-4 bg-gray-900 dark:bg-gray-950 rounded-lg shadow-2xl z-50 flex flex-col max-h-screen">
+                    {/* Header */}
+                    <div className="flex items-center justify-between p-4 border-b border-gray-700 flex-shrink-0">
+                      <h3 className="text-sm font-medium text-gray-100">Full Source Code - {label}</h3>
+                      <button
+                        onClick={() => setShowCodePreview(false)}
+                        className="text-gray-400 hover:text-gray-200 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    
+                    {/* Scrollable Code Content */}
+                    <div className="flex-1 overflow-auto p-4 min-h-0">
+                      <pre className="text-xs text-gray-100 whitespace-pre-wrap font-mono">
+                        <code>{codePreview}</code>
+                      </pre>
+                    </div>
+                    
+                    {/* Footer with actions */}
+                    <div className="p-4 border-t border-gray-700 flex justify-end space-x-2 flex-shrink-0">
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(codePreview);
+                        }}
+                        className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                      >
+                        Copy Code
+                      </button>
+                      <button
+                        onClick={() => setShowCodePreview(false)}
+                        className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           )}

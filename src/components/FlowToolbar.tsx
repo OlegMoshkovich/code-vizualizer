@@ -29,14 +29,14 @@ interface FlowToolbarProps {
   onToggleMinimap: () => void;
   onToggleCodePreview: () => void;
   onToggleLeftSidebar: () => void;
-  onLayoutChange: (direction: 'TB' | 'LR' | 'BT' | 'RL') => void;
+  onLayoutChange: (direction: 'TB' | 'LR' | 'BT' | 'RL' | 'CONNECTED') => void;
   onFilterChange: (filters: FilterOptions) => void;
   onSearchChange: (query: string) => void;
   onBackToAnalysis?: () => void;
   showMinimap: boolean;
   showCodePreview: boolean;
   isLeftSidebarVisible: boolean;
-  layoutDirection: 'TB' | 'LR' | 'BT' | 'RL';
+  layoutDirection: 'TB' | 'LR' | 'BT' | 'RL' | 'CONNECTED';
   filters: FilterOptions;
   isExporting?: boolean;
 }
@@ -48,6 +48,16 @@ interface FilterOptions {
   hideIsolated: boolean;
   minComplexity: number;
   maxComplexity: number;
+  // Function type visibility filters
+  functionTypes: {
+    exported: boolean;
+    async: boolean;
+    methods: boolean;
+    useCallback: boolean;
+    useEffect: boolean;
+    jsxHandlers: boolean;
+    regular: boolean;
+  };
 }
 
 const FlowToolbar: React.FC<FlowToolbarProps> = ({
@@ -87,7 +97,8 @@ const FlowToolbar: React.FC<FlowToolbarProps> = ({
     { value: 'TB', label: 'Top → Bottom', icon: '↓' },
     { value: 'LR', label: 'Left → Right', icon: '→' },
     { value: 'BT', label: 'Bottom → Top', icon: '↑' },
-    { value: 'RL', label: 'Right → Left', icon: '←' }
+    { value: 'RL', label: 'Right → Left', icon: '←' },
+    { value: 'CONNECTED', label: 'Connected Groups', icon: '🔗' }
   ] as const;
 
   return (
@@ -193,7 +204,7 @@ const FlowToolbar: React.FC<FlowToolbarProps> = ({
               title="Layout Direction"
             >
               <Settings className="w-4 h-4" />
-              <span className="text-sm">{layoutDirection}</span>
+              <span className="text-sm">{layoutDirection === 'CONNECTED' ? '🔗' : layoutDirection}</span>
             </button>
             
             {showLayoutControls && (
@@ -279,6 +290,102 @@ const FlowToolbar: React.FC<FlowToolbarProps> = ({
                       />
                       <span className="text-gray-700 dark:text-gray-300">Hide isolated nodes</span>
                     </label>
+                  </div>
+                  
+                  <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100 text-sm mb-2">Function Types</h4>
+                    <div className="grid grid-cols-2 gap-1 text-xs">
+                      <label className="flex items-center space-x-1">
+                        <input
+                          type="checkbox"
+                          checked={filters.functionTypes.exported}
+                          onChange={(e) => handleFilterChange({ 
+                            functionTypes: { ...filters.functionTypes, exported: e.target.checked }
+                          })}
+                          className="rounded w-3 h-3"
+                        />
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span className="text-gray-700 dark:text-gray-300">Exported</span>
+                      </label>
+                      
+                      <label className="flex items-center space-x-1">
+                        <input
+                          type="checkbox"
+                          checked={filters.functionTypes.useEffect}
+                          onChange={(e) => handleFilterChange({ 
+                            functionTypes: { ...filters.functionTypes, useEffect: e.target.checked }
+                          })}
+                          className="rounded w-3 h-3"
+                        />
+                        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                        <span className="text-gray-700 dark:text-gray-300">useEffect</span>
+                      </label>
+                      
+                      <label className="flex items-center space-x-1">
+                        <input
+                          type="checkbox"
+                          checked={filters.functionTypes.async}
+                          onChange={(e) => handleFilterChange({ 
+                            functionTypes: { ...filters.functionTypes, async: e.target.checked }
+                          })}
+                          className="rounded w-3 h-3"
+                        />
+                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                        <span className="text-gray-700 dark:text-gray-300">Async</span>
+                      </label>
+                      
+                      <label className="flex items-center space-x-1">
+                        <input
+                          type="checkbox"
+                          checked={filters.functionTypes.useCallback}
+                          onChange={(e) => handleFilterChange({ 
+                            functionTypes: { ...filters.functionTypes, useCallback: e.target.checked }
+                          })}
+                          className="rounded w-3 h-3"
+                        />
+                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                        <span className="text-gray-700 dark:text-gray-300">useCallback</span>
+                      </label>
+                      
+                      <label className="flex items-center space-x-1">
+                        <input
+                          type="checkbox"
+                          checked={filters.functionTypes.jsxHandlers}
+                          onChange={(e) => handleFilterChange({ 
+                            functionTypes: { ...filters.functionTypes, jsxHandlers: e.target.checked }
+                          })}
+                          className="rounded w-3 h-3"
+                        />
+                        <div className="w-2 h-2 bg-cyan-500 rounded-full"></div>
+                        <span className="text-gray-700 dark:text-gray-300">JSX Handlers</span>
+                      </label>
+                      
+                      <label className="flex items-center space-x-1">
+                        <input
+                          type="checkbox"
+                          checked={filters.functionTypes.methods}
+                          onChange={(e) => handleFilterChange({ 
+                            functionTypes: { ...filters.functionTypes, methods: e.target.checked }
+                          })}
+                          className="rounded w-3 h-3"
+                        />
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <span className="text-gray-700 dark:text-gray-300">Methods</span>
+                      </label>
+                      
+                      <label className="flex items-center space-x-1">
+                        <input
+                          type="checkbox"
+                          checked={filters.functionTypes.regular}
+                          onChange={(e) => handleFilterChange({ 
+                            functionTypes: { ...filters.functionTypes, regular: e.target.checked }
+                          })}
+                          className="rounded w-3 h-3"
+                        />
+                        <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+                        <span className="text-gray-700 dark:text-gray-300">Regular</span>
+                      </label>
+                    </div>
                   </div>
                   
                   <div className="border-t border-gray-200 dark:border-gray-700 pt-3">

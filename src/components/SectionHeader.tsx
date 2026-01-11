@@ -3,7 +3,7 @@
 import React from 'react';
 import { NodeProps } from '@xyflow/react';
 
-interface SectionHeaderData {
+interface SectionHeaderData extends Record<string, unknown> {
   label: string;
   type: string;
   count: number;

@@ -172,7 +172,7 @@ export function extractFunctions(ast: t.Node, sourceCode: string): FunctionData[
           async: node.async,
           exported: isExported(path),
           documentation: extractJSDoc(path, lines),
-          sourceCode: extractSourceCode(sourceCode, node.loc),
+          sourceCode: extractSourceCode(sourceCode, node.loc || null),
         }
       );
 
@@ -205,7 +205,7 @@ export function extractFunctions(ast: t.Node, sourceCode: string): FunctionData[
             async: isAsync,
             exported: isExported(path.parent),
             documentation: extractJSDoc(path, lines),
-            sourceCode: extractSourceCode(sourceCode, node.loc),
+            sourceCode: extractSourceCode(sourceCode, node.loc || null),
           }
         );
 
@@ -230,7 +230,7 @@ export function extractFunctions(ast: t.Node, sourceCode: string): FunctionData[
           async: node.async,
           exported: isClassExported(path),
           documentation: extractJSDoc(path, lines),
-          sourceCode: extractSourceCode(sourceCode, node.loc),
+          sourceCode: extractSourceCode(sourceCode, node.loc || null),
         }
       );
 
@@ -254,7 +254,7 @@ export function extractFunctions(ast: t.Node, sourceCode: string): FunctionData[
           async: node.async,
           exported: false, // Object methods are typically not directly exported
           documentation: extractJSDoc(path, lines),
-          sourceCode: extractSourceCode(sourceCode, node.loc),
+          sourceCode: extractSourceCode(sourceCode, node.loc || null),
         }
       );
 
@@ -309,7 +309,7 @@ export function extractFunctions(ast: t.Node, sourceCode: string): FunctionData[
               async: firstArg.async,
               exported: false, // Callback functions are typically not exported
               documentation: extractJSDoc(path, lines),
-              sourceCode: extractSourceCode(sourceCode, firstArg.loc),
+              sourceCode: extractSourceCode(sourceCode, firstArg.loc || null),
             }
           );
 
@@ -354,7 +354,7 @@ export function extractFunctions(ast: t.Node, sourceCode: string): FunctionData[
             async: expression.async,
             exported: false, // JSX handlers are not exported
             documentation: '', // JSX handlers typically don't have JSDoc
-            sourceCode: extractSourceCode(sourceCode, expression.loc),
+            sourceCode: extractSourceCode(sourceCode, expression.loc || null),
           }
         );
 

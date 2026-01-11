@@ -24,7 +24,7 @@ import NodeDetailsPanel from './NodeDetailsPanel';
 import StatsPanel from './StatsPanel';
 import LayoutControls from './LayoutControls';
 
-import { layoutNodes, createMatrixLayout } from '../lib/layoutEngine';
+import { layoutNodes, createMatrixLayout, createConnectedLayout } from '../lib/layoutEngine';
 import type { GraphData } from '../types';
 
 interface FlowVisualizerProps {
@@ -49,6 +49,16 @@ interface FilterOptions {
   hideIsolated: boolean;
   minComplexity: number;
   maxComplexity: number;
+  // Function type visibility filters
+  functionTypes: {
+    exported: boolean;
+    async: boolean;
+    methods: boolean;
+    useCallback: boolean;
+    useEffect: boolean;
+    jsxHandlers: boolean;
+    regular: boolean;
+  };
 }
 
 const nodeTypes = {
@@ -67,16 +77,21 @@ const applyLayoutByType = (
   nodes: Node[], 
   edges: Edge[], 
   layoutType: 'dagre' | 'force' | 'circular' | 'grid',
-  layoutDirection: 'TB' | 'LR' | 'BT' | 'RL',
+  layoutDirection: 'TB' | 'LR' | 'BT' | 'RL' | 'CONNECTED',
   spacing: { nodeSpacing: number; rankSeparation: number; edgeSeparation: number }
 ): Node[] => {
+  // Handle connected layout specially
+  if (layoutDirection === 'CONNECTED') {
+    return createConnectedLayout(nodes, edges);
+  }
+  
   switch (layoutType) {
     case 'grid':
       return createMatrixLayout(nodes, edges, 4); // 4 columns per row to accommodate wider async functions
     case 'dagre':
     default:
       return layoutNodes(nodes, edges, {
-        direction: layoutDirection,
+        direction: layoutDirection as 'TB' | 'LR' | 'BT' | 'RL',
         nodeWidth: spacing.nodeSpacing,
         nodeHeight: 80,
         rankSep: spacing.rankSeparation,
@@ -101,7 +116,7 @@ const FlowVisualizerContent: React.FC<FlowVisualizerProps> = ({ data, metadata, 
   const [isExporting, setIsExporting] = useState(false);
   
   // Layout state
-  const [layoutDirection, setLayoutDirection] = useState<'TB' | 'LR' | 'BT' | 'RL'>('TB');
+  const [layoutDirection, setLayoutDirection] = useState<'TB' | 'LR' | 'BT' | 'RL' | 'CONNECTED'>('TB');
   const [layoutType, setLayoutType] = useState<'dagre' | 'force' | 'circular' | 'grid'>('grid');
   const [spacing, setSpacing] = useState({
     nodeSpacing: 100,
@@ -123,6 +138,16 @@ const FlowVisualizerContent: React.FC<FlowVisualizerProps> = ({ data, metadata, 
     hideIsolated: false,
     minComplexity: 1,
     maxComplexity: 10,
+    // Function type visibility filters (all enabled by default)
+    functionTypes: {
+      exported: true,
+      async: true,
+      methods: true,
+      useCallback: true,
+      useEffect: true,
+      jsxHandlers: true,
+      regular: true,
+    },
   });
 
   // Initialize nodes and edges
@@ -171,6 +196,40 @@ const FlowVisualizerContent: React.FC<FlowVisualizerProps> = ({ data, metadata, 
     filteredNodes = filteredNodes.filter(node => {
       const complexity = (node.data as any).complexity || 1;
       return complexity >= filters.minComplexity && complexity <= filters.maxComplexity;
+    });
+
+    // Apply function type visibility filters
+    filteredNodes = filteredNodes.filter(node => {
+      const data = node.data as any;
+      const label = data.label || '';
+      const functionName = label.split('(')[0].trim();
+      
+      // Determine function type and check if it should be visible
+      if (data.isExported && !filters.functionTypes.exported) return false;
+      if (data.isAsync && !filters.functionTypes.async) return false;
+      if (data.category === 'method' && !filters.functionTypes.methods) return false;
+      
+      // Check for React hooks
+      if ((label.includes('(useCallback)') || /useCallback/i.test(functionName)) && !filters.functionTypes.useCallback) return false;
+      if ((label.includes('(useEffect)') || /useEffect/i.test(functionName)) && !filters.functionTypes.useEffect) return false;
+      
+      // Check for JSX handlers
+      if ((/^(on[A-Z]|handle[A-Z])/.test(functionName) || 
+           functionName.includes('Handler') || 
+           functionName.includes('onClick') ||
+           functionName.includes('onChange')) && !filters.functionTypes.jsxHandlers) return false;
+      
+      // Regular functions (not exported, async, methods, hooks, or handlers)
+      if (!data.isExported && 
+          !data.isAsync && 
+          data.category !== 'method' && 
+          !label.includes('(useCallback)') &&
+          !label.includes('(useEffect)') &&
+          !/^(on[A-Z]|handle[A-Z]|use[A-Z])/.test(functionName) &&
+          !functionName.includes('Handler') &&
+          !filters.functionTypes.regular) return false;
+      
+      return true;
     });
 
     // Filter edges to only include connections between visible nodes
@@ -276,9 +335,8 @@ const FlowVisualizerContent: React.FC<FlowVisualizerProps> = ({ data, metadata, 
       });
     } else {
       // Fit to visible nodes only
-      const nodeIds = visibleNodes.map(node => node.id);
       fitView({ 
-        nodes: nodeIds,
+        nodes: visibleNodes.map(node => ({ id: node.id })),
         duration: 800, 
         padding: 0.2,
         minZoom: 0.1,

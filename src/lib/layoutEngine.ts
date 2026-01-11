@@ -19,7 +19,7 @@ export interface LayoutOptions {
 export const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
   direction: 'TB', // Top to Bottom
   nodeWidth: 450,
-  nodeHeight: 180,
+  nodeHeight: 300, // Increased to 300px to match FunctionNode
   rankSep: 180, // Increased separation between ranks
   nodeSep: 120,  // Increased separation between nodes in same rank
 };
@@ -131,8 +131,8 @@ function calculateNodeSize(node: Node, options: LayoutOptions): { width: number;
       const paramWidth = longestParam * 8 + 100;
       width = Math.max(width, paramWidth);
       
-      // Adjust height for parameter count + fixed sections (header, returns, etc.)
-      height = Math.max(height, 180 + paramCount * 30); // More generous height calculation
+      // Adjust height for parameter count + fixed sections (header, returns, code preview, etc.)
+      height = Math.max(height, 300 + paramCount * 30); // More generous height calculation
     }
   }
 
@@ -161,7 +161,7 @@ function calculateNodeSize(node: Node, options: LayoutOptions): { width: number;
   // Set much more generous limits (matching FunctionNode component)
   const maxWidth = (data as any).isAsync ? 800 : 700; // Higher max width for async functions
   width = Math.min(Math.max(width, 400), maxWidth); // Min 400px, variable max
-  height = Math.min(Math.max(height, 180), 400); // Min 180px for clean appearance
+  height = Math.min(Math.max(height, 300), 500); // Min 300px for clean appearance with code preview
 
   return { width, height };
 }
@@ -241,9 +241,9 @@ export function createMatrixLayout(nodes: Node[], edges: Edge[], columnsPerRow: 
   if (nodes.length === 0) return nodes;
 
   const nodeWidth = 500; // Much larger width for clean appearance
-  const nodeHeight = 250; // Much larger height for clean appearance
+  const nodeHeight = 350; // Much larger height for clean appearance with code preview
   const horizontalSpacing = 850; // Much larger spacing to prevent async function overlap
-  const verticalSpacing = 350; // More generous spacing between rows
+  const verticalSpacing = 450; // More generous spacing between rows to accommodate taller nodes
   const startX = 50; // Starting X position
   const startY = 50; // Starting Y position
   const groupSpacing = 100; // Extra space between different function groups
@@ -331,13 +331,13 @@ function organizeNodesByType(nodes: Node[]): Array<{ type: string; title: string
   // Define the priority order for function types
   const typeOrder = [
     'exported',     // Exported functions (public API)
-    'async',        // Async functions  
-    'method',       // Class methods
-    'useCallback',  // React useCallback hooks
     'useEffect',    // React useEffect hooks
+    'async',        // Async functions  
+    'useCallback',  // React useCallback hooks
     'useMemo',      // React useMemo hooks
     'useState',     // React useState hooks
     'jsxHandler',   // JSX event handlers
+    'method',       // Class methods (moved to end as requested)
     'function',     // Regular functions
     'other'         // Everything else
   ];
@@ -412,6 +412,167 @@ function organizeNodesByType(nodes: Node[]): Array<{ type: string; title: string
   });
 
   return organizedGroups;
+}
+
+/**
+ * Creates a connected functions layout that groups functions by their call relationships
+ * @param nodes - Array of React Flow nodes
+ * @param edges - Array of React Flow edges
+ * @returns Positioned nodes grouped by connection clusters
+ */
+export function createConnectedLayout(nodes: Node[], edges: Edge[]): Node[] {
+  if (nodes.length === 0) return nodes;
+
+  // Find connected components (groups of functions that call each other)
+  const connectedGroups = findConnectedComponents(nodes, edges);
+  
+  // Filter out isolated nodes (nodes with no connections)
+  const connectedOnly = connectedGroups.filter(group => group.length > 1);
+  
+  if (connectedOnly.length === 0) {
+    // No connected functions, return original layout
+    return createMatrixLayout(nodes, edges);
+  }
+
+  const nodeWidth = 500;
+  const nodeHeight = 350;
+  const horizontalSpacing = 600; // Closer spacing for connected functions
+  const verticalSpacing = 450;
+  const groupHorizontalSpacing = 200; // Space between connected groups
+  const groupVerticalSpacing = 100;
+  const startX = 50;
+  const startY = 50;
+
+  const positionedNodes: Node[] = [];
+  let currentGroupX = startX;
+  let currentGroupY = startY;
+  let maxGroupHeight = 0;
+
+  // Position each connected group
+  connectedOnly.forEach((group, groupIndex) => {
+    // Calculate how many columns we need for this group
+    const columnsPerRow = Math.min(4, Math.ceil(Math.sqrt(group.length)));
+    const groupWidth = columnsPerRow * (nodeWidth + horizontalSpacing);
+    
+    // Position nodes within this group
+    group.forEach((node, index) => {
+      const row = Math.floor(index / columnsPerRow);
+      const col = index % columnsPerRow;
+      
+      const x = currentGroupX + col * (nodeWidth + horizontalSpacing);
+      const y = currentGroupY + row * (nodeHeight + verticalSpacing);
+
+      const { width, height } = calculateNodeSize(node, {
+        direction: 'TB',
+        nodeWidth,
+        nodeHeight,
+        rankSep: 150,
+        nodeSep: 80,
+      });
+
+      positionedNodes.push({
+        ...node,
+        position: { x, y },
+        style: {
+          ...node.style,
+          width,
+          height,
+        },
+      });
+    });
+
+    // Add group header
+    const groupHeader: Node = {
+      id: `connected-group-${groupIndex}`,
+      type: 'sectionHeader',
+      position: { x: currentGroupX, y: currentGroupY - 50 },
+      data: {
+        label: `🔗 Connected Group ${groupIndex + 1} (${group.length} functions)`,
+        type: 'connected',
+        count: group.length,
+        isHeader: true
+      },
+      style: {
+        width: groupWidth,
+        height: 40,
+        background: 'transparent',
+        border: 'none',
+      },
+      draggable: false,
+      selectable: false,
+    };
+    positionedNodes.push(groupHeader);
+
+    // Calculate group height for positioning next group
+    const rowsInGroup = Math.ceil(group.length / columnsPerRow);
+    const groupHeight = rowsInGroup * (nodeHeight + verticalSpacing) + groupVerticalSpacing;
+    maxGroupHeight = Math.max(maxGroupHeight, groupHeight);
+
+    // Position next group
+    currentGroupX += groupWidth + groupHorizontalSpacing;
+    
+    // If we've placed 3 groups horizontally, move to next row
+    if ((groupIndex + 1) % 3 === 0) {
+      currentGroupX = startX;
+      currentGroupY += maxGroupHeight;
+      maxGroupHeight = 0;
+    }
+  });
+
+  return positionedNodes;
+}
+
+/**
+ * Finds connected components in the graph using DFS
+ * @param nodes - Array of React Flow nodes
+ * @param edges - Array of React Flow edges
+ * @returns Array of connected components (each is an array of nodes)
+ */
+function findConnectedComponents(nodes: Node[], edges: Edge[]): Node[][] {
+  const visited = new Set<string>();
+  const components: Node[][] = [];
+  
+  // Build adjacency list
+  const adjacencyList = new Map<string, Set<string>>();
+  nodes.forEach(node => adjacencyList.set(node.id, new Set()));
+  
+  edges.forEach(edge => {
+    const sourceSet = adjacencyList.get(edge.source);
+    const targetSet = adjacencyList.get(edge.target);
+    if (sourceSet) sourceSet.add(edge.target);
+    if (targetSet) targetSet.add(edge.source);
+  });
+
+  // DFS to find connected components
+  const dfs = (nodeId: string, component: Node[]) => {
+    if (visited.has(nodeId)) return;
+    visited.add(nodeId);
+    
+    const node = nodes.find(n => n.id === nodeId);
+    if (node) component.push(node);
+    
+    const neighbors = adjacencyList.get(nodeId);
+    if (neighbors) {
+      neighbors.forEach(neighborId => {
+        if (!visited.has(neighborId)) {
+          dfs(neighborId, component);
+        }
+      });
+    }
+  };
+
+  // Find all connected components
+  nodes.forEach(node => {
+    if (!visited.has(node.id)) {
+      const component: Node[] = [];
+      dfs(node.id, component);
+      if (component.length > 0) {
+        components.push(component);
+      }
+    }
+  });
+
+  return components;
 }
 
 /**

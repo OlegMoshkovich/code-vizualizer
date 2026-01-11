@@ -18,7 +18,7 @@ import {
 
 interface LayoutControlsProps {
   layoutType: 'dagre' | 'force' | 'circular' | 'grid';
-  layoutDirection: 'TB' | 'LR' | 'BT' | 'RL';
+  layoutDirection: 'TB' | 'LR' | 'BT' | 'RL' | 'CONNECTED';
   spacing: {
     nodeSpacing: number;
     rankSeparation: number;
@@ -26,7 +26,7 @@ interface LayoutControlsProps {
   };
   autoLayout: boolean;
   onLayoutTypeChange: (type: 'dagre' | 'force' | 'circular' | 'grid') => void;
-  onLayoutDirectionChange: (direction: 'TB' | 'LR' | 'BT' | 'RL') => void;
+  onLayoutDirectionChange: (direction: 'TB' | 'LR' | 'BT' | 'RL' | 'CONNECTED') => void;
   onSpacingChange: (spacing: { nodeSpacing: number; rankSeparation: number; edgeSeparation: number }) => void;
   onAutoLayoutToggle: (enabled: boolean) => void;
   onResetLayout: () => void;
@@ -82,7 +82,8 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({
     { id: 'TB', label: 'Top → Bottom', icon: ArrowDown },
     { id: 'LR', label: 'Left → Right', icon: ArrowRight },
     { id: 'BT', label: 'Bottom → Top', icon: ArrowUp },
-    { id: 'RL', label: 'Right → Left', icon: ArrowLeft }
+    { id: 'RL', label: 'Right → Left', icon: ArrowLeft },
+    { id: 'CONNECTED', label: 'Connected Groups', icon: GitBranch }
   ] as const;
 
   const getColorClasses = (color: string, isSelected: boolean) => {
